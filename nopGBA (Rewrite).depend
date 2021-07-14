@@ -1,0 +1,38 @@
+# depslib dependency file v1.0
+1625471353 source:/home/zach/codeblocks/nopGBA (Rewrite)/cpu.cpp
+	"cpu.hpp"
+	"io.hpp"
+	<iostream>
+
+1625471378 /home/zach/codeblocks/nopGBA (Rewrite)/cpu.hpp
+	<stdint.h>
+
+1625471323 source:/home/zach/codeblocks/nopGBA (Rewrite)/main.cpp
+	<iostream>
+	"file.hpp"
+	"cpu.hpp"
+
+1624471118 /home/zach/codeblocks/nopGBA (Rewrite)/file.hpp
+	<iostream>
+
+1624472542 source:/home/zach/codeblocks/nopGBA (Rewrite)/file.cpp
+	"file.hpp"
+	"cpu.hpp"
+	"io.hpp"
+	<stdint.h>
+
+1625471306 source:/home/zach/codeblocks/nopGBA (Rewrite)/arm.cpp
+	"cpu.hpp"
+	"io.hpp"
+	<stdio.h>
+
+1625427096 /home/zach/codeblocks/nopGBA (Rewrite)/io.hpp
+	<stdint.h>
+
+1625427498 source:/home/zach/codeblocks/nopGBA (Rewrite)/io.cpp
+	"io.hpp"
+	<stdio.h>
+
+1624472281 source:/home/zach/codeblocks/nopGBA (Rewrite)/thumb.cpp
+	"cpu.hpp"
+
