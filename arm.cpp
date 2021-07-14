@@ -6,7 +6,8 @@
 
 void gbaCPU::decodeAndRunARM()
 {
-    uint32_t opcode = io.get32bitOpcode(cpu.R[15]);
+    //uint32_t opcode = io.get32bitOpcode(cpu.R[15] - 8);
+    uint32_t opcode = io.readMem(cpu.R[15] - 8, 2);
     printf("Opcode: 0x%X\n",opcode);
 
     uint8_t condition = (opcode >> 28);
@@ -118,12 +119,7 @@ void gbaCPU::runARM(uint32_t opcode)
                         switch((opcode >> 22) & 0x1)
                         {
                             case 0:
-                                //branchAndExchangeOp();
-                                printf("BRANCH EXCHANGE NOT IMPLEMENTED!\n");
-                                while(true)
-                                {
-
-                                }
+                                cpu.BX(opcode);
                             break;
 
                             case 1:
@@ -215,12 +211,72 @@ void gbaCPU::runARM(uint32_t opcode)
             switch(((opcode >> 21) & 0xF)) // DATA PROCESSING IMMEDIATE
             {
 
-                case 0xD: // MOV
+                case 0x0:
+                    cpu.DPI_AND(opcode);
+                break;
+
+                case 0x1:
+                    cpu.DPI_EOR(opcode);
+                break;
+
+                case 0x2:
+                    cpu.DPI_SUB(opcode);
+                break;
+
+                case 0x3:
+                    cpu.DPI_RSB(opcode);
+                break;
+
+                case 0x4:
+                    cpu.DPI_ADD(opcode);
+                break;
+
+                case 0x5:
+                    cpu.DPI_ADC(opcode);
+                break;
+
+                case 0x6:
+                    cpu.DPI_SBC(opcode);
+                break;
+
+                case 0x7:
+                    cpu.DPI_RSC(opcode);
+                break;
+
+                case 0x8:
+                    cpu.DPI_TST(opcode);
+                break;
+
+                case 0x9:
+                    cpu.DPI_TEQ(opcode);
+                break;
+
+                case 0xA:
+                    cpu.DPI_CMP(opcode);
+                break;
+
+                case 0xB:
+                    cpu.DPI_CMN(opcode);
+                break;
+
+                case 0xC:
+                    cpu.DPI_ORR(opcode);
+                break;
+
+                case 0xD:
                     cpu.DPI_MOV(opcode);
                 break;
 
+                case 0xE:
+                    cpu.DPI_BIC(opcode);
+                break;
+
+                case 0xF:
+                    cpu.DPI_MVN(opcode);
+                break;
+
                 default:
-                    printf("Data Processing Immediate 0x%X not implemented!\n",((opcode >> 21) & 0xF));
+                    printf("BAD_ERROR: Data Processing Immediate 0x%X not implemented!\n",((opcode >> 21) & 0xF));
                     while(1)
                     {
                         // Temporary
@@ -306,6 +362,475 @@ void gbaCPU::BL(uint32_t opcode) // Branch or Branch with Link
     cpu.R[15] = ((cpu.R[15] + branchOffset) + 8);
 }
 
+void gbaCPU::BX(uint32_t opcode) // Branch or Branch with Link
+{
+    uint8_t Rm = ((opcode) & 0xF);
+    cpu.cpsr.T = ((cpu.R[Rm] & 0xFFFFFFFE) != 0);
+    cpu.R[15] = cpu.R[Rm] & 0xFFFFFFFE;
+    if(cpu.cpsr.T == 0)
+    {
+        cpu.R[15] += 8;
+    }
+    if(cpu.cpsr.T == 1)
+    {
+        cpu.R[15] += 4;
+    }
+}
+
+void gbaCPU::DPI_ADD(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    uint32_t result = cpu.R[Rn] + aluVal;
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = (0xFFFFFFFF < (cpu.R[Rn] + aluVal));
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[Rd] = result;
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 4;
+    }
+}
+void gbaCPU::DPI_CMN(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    uint32_t result = cpu.R[Rn] + aluVal;
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = (0xFFFFFFFF < (cpu.R[Rn] + aluVal));
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[15] += 4;
+}
+
+void gbaCPU::DPI_ADC(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    uint32_t result = cpu.R[Rn] + aluVal + cpu.cpsr.C;
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = (0xFFFFFFFF < (cpu.R[Rn] + aluVal + cpu.cpsr.C));
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[Rd] = result;
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 4;
+    }
+}
+
+void gbaCPU::DPI_SUB(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    uint32_t result = cpu.R[Rn] - aluVal;
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = (0xFFFFFFFF >= (cpu.R[Rn] - aluVal));
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[Rd] = result;
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 4;
+    }
+}
+
+void gbaCPU::DPI_CMP(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    uint32_t result = cpu.R[Rn] - aluVal;
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = (0xFFFFFFFF >= (cpu.R[Rn] - aluVal));
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[15] += 4;
+}
+
+void gbaCPU::DPI_SBC(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    uint32_t result = cpu.R[Rn] - aluVal - (!cpu.cpsr.C);
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = (0xFFFFFFFF >= (cpu.R[Rn] - aluVal - (!cpu.cpsr.C)));
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[Rd] = result;
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 4;
+    }
+}
+
+void gbaCPU::DPI_RSB(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    uint32_t result = aluVal - cpu.R[Rn];
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = (0xFFFFFFFF >= (aluVal - cpu.R[Rn]));
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[Rd] = result;
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 4;
+    }
+}
+
+void gbaCPU::DPI_RSC(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    uint32_t result = aluVal - cpu.R[Rn] - (!cpu.cpsr.C);
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = (0xFFFFFFFF >= (aluVal - cpu.R[Rn] - (!cpu.cpsr.C)));
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[Rd] = result;
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 4; // Could be an issue?
+    }
+}
+
+void gbaCPU::DPI_EOR(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    bool carryOut = ((value & 0x80000000) != 0);
+    if(shiftAmount != 0)
+    {
+        carryOut = ((rotr32(value,(shiftAmount - 1)) & 0x80000000) != 0);
+    }
+    uint32_t result = cpu.R[Rn] ^ aluVal;
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = carryOut;
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[Rd] = result;
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 4;
+    }
+    printf("result: 0x%X\n",result);
+}
+
+void gbaCPU::DPI_ORR(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    bool carryOut = ((value & 0x80000000) != 0);
+    if(shiftAmount != 0)
+    {
+        carryOut = ((rotr32(value,(shiftAmount - 1)) & 0x80000000) != 0);
+    }
+    uint32_t result = cpu.R[Rn] | aluVal;
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = carryOut;
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[Rd] = result;
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 4;
+    }
+    printf("result: 0x%X\n",result);
+}
+
+void gbaCPU::DPI_TEQ(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    bool carryOut = ((value & 0x80000000) != 0);
+    if(shiftAmount != 0)
+    {
+        carryOut = ((rotr32(value,(shiftAmount - 1)) & 0x80000000) != 0);
+    }
+    uint32_t result = cpu.R[Rn] ^ aluVal;
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = carryOut;
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 4; // Could be an issue?
+    }
+}
+
+void gbaCPU::DPI_AND(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    bool carryOut = ((value & 0x80000000) != 0);
+    if(shiftAmount != 0)
+    {
+        carryOut = ((rotr32(value,(shiftAmount - 1)) & 0x80000000) != 0);
+    }
+    uint32_t result = cpu.R[Rn] & aluVal;
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = carryOut;
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[Rd] = result;
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 4; // Could be an issue?
+    }
+}
+
+void gbaCPU::DPI_BIC(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    bool carryOut = ((value & 0x80000000) != 0);
+    if(shiftAmount != 0)
+    {
+        carryOut = ((rotr32(value,(shiftAmount - 1)) & 0x80000000) != 0);
+    }
+    uint32_t result = cpu.R[Rn] & (!aluVal);
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = carryOut;
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[Rd] = result;
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 4; // Could be an issue?
+    }
+}
+
+void gbaCPU::DPI_TST(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    shiftAmount *= 2;
+    uint32_t aluVal = rotr32(value,shiftAmount);
+    bool carryOut = ((value & 0x80000000) != 0);
+    if(shiftAmount != 0)
+    {
+        carryOut = ((rotr32(value,(shiftAmount - 1)) & 0x80000000) != 0);
+    }
+    uint32_t result = cpu.R[Rn] & aluVal;
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            cpu.cpsr = cpu.spsr;
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = carryOut;
+        }
+    }
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 4; // Could be an issue?
+    }
+}
+
 void gbaCPU::DPI_MOV(uint32_t opcode)
 {
     uint32_t value = (opcode & 0xFF);
@@ -313,6 +838,29 @@ void gbaCPU::DPI_MOV(uint32_t opcode)
     uint8_t Rd = ((opcode >> 12) & 0xF);
     shiftAmount *= 2;
     cpu.R[Rd] = rotr32(value,shiftAmount);
+
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        cpu.cpsr.N = ((cpu.R[Rd] & 0x80000000) != 0);
+        cpu.cpsr.Z = (cpu.R[Rd] == 0);
+    }
+    if(shiftAmount != 0)
+    {
+        cpu.cpsr.C = ((cpu.R[Rd] & 0x80000000) != 0);
+    }
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 4;
+    }
+}
+
+void gbaCPU::DPI_MVN(uint32_t opcode)
+{
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = ((opcode >> 8) & 0xF);
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    shiftAmount *= 2;
+    cpu.R[Rd] = (!(rotr32(value,shiftAmount)));
 
     if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
     {

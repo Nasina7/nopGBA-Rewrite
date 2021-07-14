@@ -49,7 +49,7 @@ void gbaCPU::doOpcode()
         break;
 
         case modeThumb:
-
+            decodeAndRunTHUMB();
         break;
     }
 }

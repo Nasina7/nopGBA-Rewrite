@@ -41,6 +41,7 @@
 		<Unit filename="io.hpp" />
 		<Unit filename="main.cpp" />
 		<Unit filename="thumb.cpp" />
+		<Unit filename="z80.cpp" />
 		<Unit filename="|" />
 		<Extensions />
 	</Project>

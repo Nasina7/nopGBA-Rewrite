@@ -38,7 +38,7 @@ int main()
         cout<<"ROM COULD NOT BE LOADED!"<<endl;
         return 1;
     }
-    cpu.R[15] = 0x08000000;
+    cpu.R[15] = 0x08000008;
     //cpu.doOpcode();
     //printf("0x%X\n",cpu.R[15]);
     //return 0;
@@ -46,5 +46,7 @@ int main()
     while(true) // Main EMU Loop
     {
         cpu.doOpcode();
+        printf("CPSR: \nN: 0x%X\nZ: 0x%X\nC: 0x%X\n",cpu.cpsr.N,cpu.cpsr.Z,cpu.cpsr.C);
+        printf("R15: 0x%X\n",cpu.R[15]);
     }
 }

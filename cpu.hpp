@@ -46,7 +46,8 @@ class gbaCPU {
     private:
         void decodeAndRunARM();
         void runARM(uint32_t opcode);
-        void decodeAndRunTHUMB(uint16_t opcode);
+        void decodeAndRunTHUMB();
+        void runTHUMB(uint16_t opcode);
 
 
 
@@ -54,7 +55,25 @@ class gbaCPU {
         // Full opcode list
         // ARM
         void BL(uint32_t opcode);
+        void BX(uint32_t opcode);
         void DPI_MOV(uint32_t opcode);
+        void DPI_ADD(uint32_t opcode);
+
+        void DPI_ADC(uint32_t opcode);
+        void DPI_AND(uint32_t opcode);
+        void DPI_BIC(uint32_t opcode);
+        void DPI_CMN(uint32_t opcode);
+        void DPI_CMP(uint32_t opcode);
+        void DPI_EOR(uint32_t opcode);
+        void DPI_MVN(uint32_t opcode);
+        void DPI_ORR(uint32_t opcode);
+        void DPI_RSB(uint32_t opcode);
+        void DPI_RSC(uint32_t opcode);
+        void DPI_SBC(uint32_t opcode);
+        void DPI_SUB(uint32_t opcode);
+        void DPI_TEQ(uint32_t opcode);
+        void DPI_TST(uint32_t opcode);
+
 
         void DPR_ADD(uint32_t opcode);
         void LDST_IMD(uint32_t opcode);
@@ -66,6 +85,58 @@ class gbaCPU {
 
 
         // Thumb
+        void T_LD_LP(uint16_t opcode);
+        void T_LSL_IMD(uint16_t opcode);
+        void T_LSR_IMD(uint16_t opcode);
+        void T_ASR_IMD(uint16_t opcode);
+
+        void T_CMP_IMD(uint16_t opcode);
+        void T_ADD_IMD(uint16_t opcode);
+        void T_SUB_IMD(uint16_t opcode);
+        void T_MOV_IMD(uint16_t opcode);
+
+        void T_ADD_REG(uint16_t opcode);
+        void T_SUB_REG(uint16_t opcode);
+
+        void T_AND_ALU(uint16_t opcode);
+        void T_EOR_ALU(uint16_t opcode);
+        void T_LSL_ALU(uint16_t opcode);
+        void T_LSR_ALU(uint16_t opcode);
+        void T_ASR_ALU(uint16_t opcode);
+        void T_ADC_ALU(uint16_t opcode);
+        void T_SBC_ALU(uint16_t opcode);
+        void T_ROR_ALU(uint16_t opcode);
+        void T_TST_ALU(uint16_t opcode);
+        void T_NEG_ALU(uint16_t opcode);
+        void T_CMP_ALU(uint16_t opcode);
+        void T_CMN_ALU(uint16_t opcode);
+        void T_ORR_ALU(uint16_t opcode);
+        void T_MUL_ALU(uint16_t opcode);
+        void T_BIC_ALU(uint16_t opcode);
+        void T_MVN_ALU(uint16_t opcode);
+
+
+        void T_BL(uint16_t opcode);
+
+        void T_B_EQ(uint16_t opcode);
+        void T_B_NE(uint16_t opcode);
+        void T_B_CS(uint16_t opcode);
+        void T_B_CC(uint16_t opcode);
+        void T_B_MI(uint16_t opcode);
+        void T_B_PL(uint16_t opcode);
+        void T_B_VS(uint16_t opcode);
+        void T_B_VC(uint16_t opcode);
+        void T_B_HI(uint16_t opcode);
+        void T_B_LS(uint16_t opcode);
+        void T_B_GE(uint16_t opcode);
+        void T_B_LT(uint16_t opcode);
+        void T_B_GT(uint16_t opcode);
+        void T_B_LE(uint16_t opcode);
+};
+
+class gbCPU {
+    public:
+
 
 };
 
