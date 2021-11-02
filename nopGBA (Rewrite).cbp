@@ -5,6 +5,7 @@
 		<Option title="nopGBA (Rewrite)" />
 		<Option pch_mode="2" />
 		<Option compiler="gcc" />
+		<Option virtualFolders="imgui/" />
 		<Build>
 			<Target title="Debug">
 				<Option output="bin/Debug/nopGBA (Rewrite)" prefix_auto="1" extension_auto="1" />
@@ -12,8 +13,16 @@
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Compiler>
+					<Add option="-pg" />
 					<Add option="-g" />
 				</Compiler>
+				<Linker>
+					<Add option="-pg" />
+					<Add option="-lSDL2" />
+					<Add option="-lGLU" />
+					<Add option="-lGL" />
+					<Add option="-lGLEW" />
+				</Linker>
 			</Target>
 			<Target title="Release">
 				<Option output="bin/Release/nopGBA (Rewrite)" prefix_auto="1" extension_auto="1" />
@@ -21,10 +30,16 @@
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Compiler>
-					<Add option="-O2" />
+					<Add option="-fexpensive-optimizations" />
+					<Add option="-O3" />
+					<Add option="-pg" />
 				</Compiler>
 				<Linker>
-					<Add option="-s" />
+					<Add option="-pg" />
+					<Add option="-lSDL2" />
+					<Add option="-lGLU" />
+					<Add option="-lGL" />
+					<Add option="-lGLEW" />
 				</Linker>
 			</Target>
 		</Build>
@@ -32,15 +47,90 @@
 			<Add option="-Wall" />
 			<Add option="-fexceptions" />
 		</Compiler>
+		<Unit filename="CustomFont.cpp">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="CustomFont.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="ImGuiFileDialog.cpp">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="ImGuiFileDialog.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="ImGuiFileDialogConfig.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
 		<Unit filename="arm.cpp" />
 		<Unit filename="cpu.cpp" />
 		<Unit filename="cpu.hpp" />
+		<Unit filename="display.cpp" />
+		<Unit filename="display.hpp" />
 		<Unit filename="file.cpp" />
 		<Unit filename="file.hpp" />
+		<Unit filename="imconfig.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imfilebrowser.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imgui.cpp">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imgui.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imgui_demo.cpp">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imgui_draw.cpp">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imgui_impl_opengl3.cpp">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imgui_impl_opengl3.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imgui_impl_sdl.cpp">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imgui_impl_sdl.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imgui_internal.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imgui_memory_editor.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imgui_sdl.cpp">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imgui_sdl.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imgui_widgets.cpp">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imstb_rectpack.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imstb_textedit.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="imstb_truetype.h">
+			<Option virtualFolder="imgui/" />
+		</Unit>
+		<Unit filename="input.cpp" />
+		<Unit filename="input.hpp" />
 		<Unit filename="io.cpp" />
 		<Unit filename="io.hpp" />
 		<Unit filename="main.cpp" />
 		<Unit filename="thumb.cpp" />
+		<Unit filename="ui.cpp" />
+		<Unit filename="ui.hpp" />
 		<Unit filename="z80.cpp" />
 		<Unit filename="|" />
 		<Extensions />

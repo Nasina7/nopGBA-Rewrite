@@ -1,11 +1,13 @@
 #include "cpu.hpp"
 #include "io.hpp"
+#include "ui.hpp"
 #include <stdio.h>
 
 void gbaCPU::decodeAndRunTHUMB()
 {
-    uint16_t opcode = io.readMem(cpu.R[15]- 4, 1);
-    printf("Opcode: 0x%X\n",opcode);
+    uint16_t opcode = io.readMem(cpu.R[15], 1);
+    cpu.lastOpcodeRan = opcode;
+    //printf("Opcode: 0x%X\n",opcode);
     cpu.runTHUMB(opcode);
 }
 
@@ -33,10 +35,7 @@ void gbaCPU::runTHUMB(uint16_t opcode)
 
                         default:
                             printf("BAD_ERROR: Impossible Code Path!\n");
-                            while(1)
-                            {
-
-                            }
+                            ui.pauseEmulation = true;
                         break;
                     }
                 break;
@@ -55,10 +54,15 @@ void gbaCPU::runTHUMB(uint16_t opcode)
                 break;
 
                 case 7: // 000-111 Add Subtract Immediate
-                    printf("THUMB: Add Subtract Immediate not implemented!\n");
-                    while(1)
+                    switch((opcode >> 9) & 0x1)
                     {
+                        case 0: // Add
+                            cpu.T_ADD_SIMD(opcode);
+                        break;
 
+                        case 1: // Sub
+                            cpu.T_SUB_SIMD(opcode);
+                        break;
                     }
                 break;
             }
@@ -157,11 +161,29 @@ void gbaCPU::runTHUMB(uint16_t opcode)
                     }
                 break;
 
-                case 1: // 010-001  Special Data Processing
-                    printf("THUMB: Special Data Processing not implemented!\n");
-                    while(1)
+                case 1: // 010-001  Special Data Processing or Branch Exchange
+                    switch((opcode >> 8) & 0x3)
                     {
+                        case 0:
+                            T_SDP_ADD(opcode);
+                        break;
 
+                        case 1:
+                            T_SDP_CMP(opcode);
+                        break;
+
+                        case 2:
+                            T_SDP_MOV(opcode);
+                        break;
+
+                        case 3:
+                            T_BX(opcode);
+                        break;
+
+                        default:
+                            printf("BAD_ERROR: IMPOSSIBLE CODE PATH!\n");
+                            ui.pauseEmulation = true;
+                        break;
                     }
                 break;
 
@@ -170,10 +192,119 @@ void gbaCPU::runTHUMB(uint16_t opcode)
                 break;
 
                 case 4 ... 7: // 010-1XX  Load Store Register Offset
-                    printf("THUMB: Load Store from Register Offset not implemented!\n");
-                    while(1)
+                    switch((opcode >> 9) & 0x1)
                     {
+                        case 0:
+                            T_LDST_REG(opcode);
+                        break;
 
+                        case 1:
+                            T_LDSTSBH_REG(opcode);
+                        break;
+                    }
+
+                break;
+            }
+        break;
+
+        case 3: // Lost store word/byte immediate offset
+            switch((opcode >> 11) & 0x3)
+            {
+                case 0: // STR
+                    T_STR_IMD(opcode);
+                break;
+
+                case 1: // LDR
+                    T_LDR_IMD(opcode);
+                break;
+
+                case 2: // STRB
+                    T_STRB_IMD(opcode);
+                break;
+
+                case 3: // LDRB
+                    T_LDRB_IMD(opcode);
+                break;
+            }
+        break;
+
+        case 4:
+            switch((opcode >> 12) & 0x1)
+            {
+                case 0:
+                    switch((opcode >> 11) & 0x1)
+                    {
+                        case 0: // STRH
+                            cpu.T_STRH_IMD(opcode);
+                        break;
+
+                        case 1: // LDRH
+                            cpu.T_LDRH_IMD(opcode);
+                        break;
+                    }
+                break;
+
+                case 1: // Load/Store to/from stack
+                    switch((opcode >> 11) & 0x1)
+                    {
+                        case 0: // STR
+                            cpu.T_STR_SP(opcode);
+                        break;
+
+                        case 1: // LDR
+                            cpu.T_LDR_SP(opcode);
+                        break;
+                    }
+                break;
+            }
+        break;
+
+        case 5:
+            switch((opcode >> 12) & 0x1)
+            {
+                case 0: // Add to SP or PC
+                    switch((opcode >> 11) & 0x1)
+                    {
+                        case 0: // Add to PC and store in Rd
+                            cpu.T_ADD_PC(opcode);
+                        break;
+
+                        case 1: // Add to SP and store in Rd
+                            cpu.T_ADD_SP(opcode);
+                        break;
+                    }
+                break;
+
+                case 1: // Misc Instructions
+                    switch((opcode >> 9) & 0x3)
+                    {
+                        case 0:
+                            T_ADJ_STACK(opcode);
+                        break;
+
+                        case 2: // Push/Pop Register List
+                            switch((opcode >> 11) & 0x1)
+                            {
+                                case 0: // PUSH
+                                    T_PUSH(opcode);
+                                break;
+
+                                case 1: // POP
+                                    T_POP(opcode);
+                                break;
+                            }
+                        break;
+
+                        case 3:
+                            printf("THUMB: Unimplemented 101 Software Interrupt!\n");
+                            // Does this even exist on the GBA?  Need to check later.
+                            ui.pauseEmulation = true;
+                        break;
+
+                        default:
+                            printf("BAD_ERROR: Invalid Instruction!\n");
+                            ui.pauseEmulation = true;
+                        break;
                     }
                 break;
             }
@@ -183,10 +314,15 @@ void gbaCPU::runTHUMB(uint16_t opcode)
             switch((opcode >> 8) & 0x1F)
             {
                 case 0x0 ... 0xF: // 110-0XXXX Load Store Multiple
-                    printf("THUMB: Load Store Multiple not implemented!\n");
-                    while(1)
+                    switch((opcode >> 11) & 0x1)
                     {
+                        case 0: // STMIA
+                            T_STMIA(opcode);
+                        break;
 
+                        case 1: // LDMIA
+                            T_LDMIA(opcode);
+                        break;
                     }
                 break;
 
@@ -251,28 +387,18 @@ void gbaCPU::runTHUMB(uint16_t opcode)
 
                         default:
                             printf("BAD_ERROR: Impossible Code Path!\n");
-                            while(1)
-                            {
-
-                            }
+                            ui.pauseEmulation = true;
                         break;
                     }
                 break;
 
                 case 0x1E: // Undefined Instruction
                     printf("THUMB ERROR: Invalid opcode 0x%X!\n",opcode);
-                    while(1)
-                    {
-                        // This is temporary
-                    }
+                    ui.pauseEmulation = true;
                 break;
 
                 case 0x1F: // Software Interrupt
-                    printf("THUMB: Software Interrupt not implemented!\n");
-                    while(1)
-                    {
-
-                    }
+                    cpu.T_SWI(opcode);
                 break;
             }
         break;
@@ -281,19 +407,12 @@ void gbaCPU::runTHUMB(uint16_t opcode)
             switch((opcode >> 11) & 3)
             {
                 case 0: // Unconditional Branch
-                    printf("THUMB: Unconditional Branch not Implemented! 0x%X\n",opcode);
-                    while(1)
-                    {
-                        // This is temporary
-                    }
+                    cpu.T_B(opcode);
                 break;
 
                 case 1: // BLX Suffix or Undefined Instruction
                     printf("THUMB: THIS SHOULD NOT HAPPEN! 0x%X\n",opcode);
-                    while(1)
-                    {
-                        // This is temporary
-                    }
+                    ui.pauseEmulation = true;
                 break;
 
                 case 2: // BL Prefix
@@ -302,38 +421,91 @@ void gbaCPU::runTHUMB(uint16_t opcode)
 
                 case 3: // BL Suffix
                     printf("THUMB: THIS SHOULD NOT HAPPEN! 0x%X\n",opcode);
-                    while(1)
-                    {
-                        // This is temporary
-                    }
+                    ui.pauseEmulation = true;
                 break;
             }
         break;
 
         default:
             printf("Unimplemented opcode 0x%X\n",opcode);
-            while(1)
-            {
-                // This is temporary
-            }
+            ui.pauseEmulation = true;
         break;
     }
 }
 
 // BEGINNING OF THUMB OPCODES
+void gbaCPU::T_STMIA(uint16_t opcode)
+{
+    cpu.R[15] += 2;
+    uint8_t Rn = ((opcode >> 8) & 0x7);
+    uint8_t regList = (opcode & 0xFF);
+    uint32_t startAddress = cpu.R[Rn];
+    uint8_t setBits = 0;
+    bool setBitArray[8];
+    for(int i = 0; i < 8; i++)
+    {
+        setBitArray[i] = false;
+        if(((regList >> i) & 0x1) != 0)
+        {
+            setBits++;
+            setBitArray[i] = true;
+        }
+    }
+    for(int i = 0; i < 8; i++)
+    {
+        if(setBitArray[i] == true)
+        {
+            io.writeMem(startAddress, 2, cpu.R[i]);
+            startAddress += 4;
+        }
+    }
+    cpu.R[Rn] = cpu.R[Rn] + (setBits * 4);
+}
+
+void gbaCPU::T_LDMIA(uint16_t opcode)
+{
+    cpu.R[15] += 2;
+    uint8_t Rn = ((opcode >> 8) & 0x7);
+    uint8_t regList = (opcode & 0xFF);
+    uint32_t startAddress = cpu.R[Rn];
+    uint8_t setBits = 0;
+    bool setBitArray[8];
+    for(int i = 0; i < 8; i++)
+    {
+        setBitArray[i] = false;
+        if(((regList >> i) & 0x1) != 0)
+        {
+            setBits++;
+            setBitArray[i] = true;
+        }
+    }
+    for(int i = 0; i < 8; i++)
+    {
+        if(setBitArray[i] == true)
+        {
+            cpu.R[i] = io.readMem(startAddress, 2); // Is this correct?
+            startAddress += 4;
+        }
+    }
+    cpu.R[Rn] = cpu.R[Rn] + (setBits * 4);
+}
+
 void gbaCPU::T_LD_LP(uint16_t opcode)
 {
+    cpu.R[15] += 2;
+    cpu.R[15] += 2;
     uint32_t location = cpu.R[15] & 0xFFFFFFFC;
     location += ((opcode & 0x00FF) * 4);
     uint8_t Rd = ((opcode >> 8) & 0x7);
+    cpu.R[15] -= 2;
     cpu.R[Rd] = io.readMem(location, 2);
-    cpu.R[15] += 2;
 }
 
 void gbaCPU::T_LSL_IMD(uint16_t opcode)
 {
-    uint8_t Rd = ((opcode >> 3) & 0x7);
-    uint8_t Rm = ((opcode) & 0x7);
+    cpu.R[15] += 2;
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t Rm = ((opcode >> 3) & 0x7);
     uint8_t shiftVal = ((opcode >> 6) & 0x1F);
 
     if(shiftVal == 0)
@@ -347,34 +519,34 @@ void gbaCPU::T_LSL_IMD(uint16_t opcode)
     }
     cpu.cpsr.N = ((cpu.R[Rd] & 0x80000000) != 0);
     cpu.cpsr.Z = (cpu.R[Rd] == 0);
-    cpu.R[15] += 2;
 }
 
 void gbaCPU::T_LSR_IMD(uint16_t opcode)
 {
-    uint8_t Rd = ((opcode >> 3) & 0x7);
-    uint8_t Rm = ((opcode) & 0x7);
+    cpu.R[15] += 2;
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t Rm = ((opcode >> 3) & 0x7);
     uint8_t shiftVal = ((opcode >> 6) & 0x1F);
 
     if(shiftVal == 0)
     {
-        cpu.R[Rd] = cpu.R[Rm];
-        cpu.cpsr.C = ((cpu.R[Rd] & 0x80000000) != 0);
+        cpu.cpsr.C = ((cpu.R[Rm] & 0x80000000) != 0);
+        cpu.R[Rd] = 0;
     }
     if(shiftVal != 0)
     {
-        cpu.cpsr.C = ( ( ( cpu.R[Rd] >> (shiftVal - 1) ) & 0x1 ) != 0); // != 0 might be unneeded
+        cpu.cpsr.C = ( ( ( cpu.R[Rm] >> (shiftVal - 1) ) & 0x1 ) != 0); // != 0 might be unneeded
         cpu.R[Rd] = (cpu.R[Rm] >> shiftVal);
     }
     cpu.cpsr.N = ((cpu.R[Rd] & 0x80000000) != 0);
     cpu.cpsr.Z = (cpu.R[Rd] == 0);
-    cpu.R[15] += 2;
 }
 
 void gbaCPU::T_ASR_IMD(uint16_t opcode)
 {
-    uint8_t Rd = ((opcode >> 3) & 0x7);
-    uint8_t Rm = ((opcode) & 0x7);
+    cpu.R[15] += 2;
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t Rm = ((opcode >> 3) & 0x7);
     uint8_t shiftVal = ((opcode >> 6) & 0x1F);
 
     if(shiftVal == 0)
@@ -396,7 +568,6 @@ void gbaCPU::T_ASR_IMD(uint16_t opcode)
     }
     cpu.cpsr.N = ((cpu.R[Rd] & 0x80000000) != 0);
     cpu.cpsr.Z = (cpu.R[Rd] == 0);
-    cpu.R[15] += 2;
 }
 
 void gbaCPU::T_B_EQ(uint16_t opcode)
@@ -412,6 +583,16 @@ void gbaCPU::T_B_EQ(uint16_t opcode)
     {
         cpu.R[15] += 2;
     }
+}
+void gbaCPU::T_B(uint16_t opcode)
+{
+    int32_t jumpVal = (opcode & 0x7FF);
+    jumpVal = jumpVal << 1;
+    jumpVal = jumpVal << 20;
+    jumpVal = jumpVal >> 20;
+    cpu.R[15] += jumpVal;
+    cpu.R[15] += 4;
+
 }
 void gbaCPU::T_B_NE(uint16_t opcode)
 {
@@ -580,6 +761,7 @@ void gbaCPU::T_B_LE(uint16_t opcode)
 
 void gbaCPU::T_CMP_IMD(uint16_t opcode)
 {
+    cpu.R[15] += 2;
     uint8_t Rn = ((opcode >> 8) & 0x7);
     uint8_t imdVal = (opcode & 0xFF);
 
@@ -588,12 +770,14 @@ void gbaCPU::T_CMP_IMD(uint16_t opcode)
 
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF >= (cpu.R[Rn] - imdVal));
-    // MISSING V IMPLEMENTATION, SEE PG. 339
-    cpu.R[15] += 2;
+    cpu.cpsr.C = ((uint64_t)0xFFFFFFFF >= ((uint64_t)cpu.R[Rn] - (uint64_t)imdVal));
+    cpu.cpsr.V = (( (uint64_t)cpu.R[Rn] ^ (uint64_t)imdVal ) &
+                     ( ( (uint64_t)cpu.R[Rn] ^ result ) ) &
+                     0x80000000 ) != 0;
 }
 void gbaCPU::T_SUB_IMD(uint16_t opcode)
 {
+    cpu.R[15] += 2;
     uint8_t Rd = ((opcode >> 8) & 0x7);
     uint8_t imdVal = (opcode & 0xFF);
 
@@ -602,13 +786,16 @@ void gbaCPU::T_SUB_IMD(uint16_t opcode)
 
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF >= (cpu.R[Rd] - imdVal));
+    cpu.cpsr.C = ((uint64_t)0xFFFFFFFF >= ((uint64_t)cpu.R[Rd] - (uint64_t)imdVal));
+    cpu.cpsr.V = (( (uint64_t)cpu.R[Rd] ^ (uint64_t)imdVal ) &
+                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+                     0x80000000 ) != 0;
     cpu.R[Rd] = result;
     // MISSING V IMPLEMENTATION, SEE PG. 339
-    cpu.R[15] += 2;
 }
 void gbaCPU::T_ADD_IMD(uint16_t opcode)
 {
+    cpu.R[15] += 2;
     uint8_t Rd = ((opcode >> 8) & 0x7);
     uint8_t imdVal = (opcode & 0xFF);
 
@@ -617,13 +804,78 @@ void gbaCPU::T_ADD_IMD(uint16_t opcode)
 
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF < (cpu.R[Rd] + imdVal));
+    cpu.cpsr.C = ((uint64_t)0xFFFFFFFF < ((uint64_t)cpu.R[Rd] + (uint64_t)imdVal));
+
+    cpu.cpsr.V = ( ~ ( (uint64_t)cpu.R[Rd] ^ (uint64_t)imdVal ) &
+                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+                     0x80000000 ) != 0;
+
     cpu.R[Rd] = result;
     // MISSING V IMPLEMENTATION, SEE PG. 339
+}
+
+void gbaCPU::T_ADD_PC(uint16_t opcode)
+{
+    //ui.pauseEmulation = true;
     cpu.R[15] += 2;
+    cpu.R[15] += 2;
+    uint8_t Rd = ((opcode >> 8) & 0x7);
+    uint8_t imdVal = (opcode & 0xFF);
+
+    cpu.R[Rd] = (cpu.R[15] + (imdVal << 2)) - 2;
+    cpu.R[15] -= 2;
+}
+void gbaCPU::T_ADD_SP(uint16_t opcode)
+{
+    cpu.R[15] += 2;
+    uint8_t Rd = ((opcode >> 8) & 0x7);
+    uint8_t imdVal = (opcode & 0xFF);
+
+    cpu.R[Rd] = cpu.R[13] + (imdVal << 2);
+}
+void gbaCPU::T_ADD_SIMD(uint16_t opcode)
+{
+    cpu.R[15] += 2;
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t Rn = ((opcode >> 3) & 0x7);
+    uint8_t imdVal = ((opcode >> 6) & 0x7);
+
+
+    uint32_t result = cpu.R[Rn] + imdVal;
+
+
+    cpu.cpsr.N = ((result & 0x80000000) != 0);
+    cpu.cpsr.Z = (result == 0);
+    cpu.cpsr.C = (0xFFFFFFFF < ((uint64_t)cpu.R[Rn] + (uint64_t)imdVal));
+    cpu.cpsr.V = ( ~ ( (uint64_t)cpu.R[Rd] ^ (uint64_t)imdVal ) &
+                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+                     0x80000000 ) != 0;
+    cpu.R[Rd] = result;
+    // MISSING V IMPLEMENTATION, SEE PG. 309
+}
+void gbaCPU::T_SUB_SIMD(uint16_t opcode)
+{
+    cpu.R[15] += 2;
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t Rn = ((opcode >> 3) & 0x7);
+    uint8_t imdVal = ((opcode >> 6) & 0x7);
+
+
+    uint32_t result = cpu.R[Rn] - imdVal;
+
+
+    cpu.cpsr.N = ((result & 0x80000000) != 0);
+    cpu.cpsr.Z = (result == 0);
+    cpu.cpsr.C = (0xFFFFFFFF >= ((uint64_t)cpu.R[Rn] - (uint64_t)imdVal));
+    cpu.cpsr.V = (( (uint64_t)cpu.R[Rd] ^ (uint64_t)imdVal ) &
+                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+                     0x80000000 ) != 0;
+    cpu.R[Rd] = result;
+    // MISSING V IMPLEMENTATION, SEE PG. 309
 }
 void gbaCPU::T_ADD_REG(uint16_t opcode)
 {
+    cpu.R[15] += 2;
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t Rn = ((opcode >> 3) & 0x7);
     uint8_t Rm = ((opcode >> 6) & 0x7);
@@ -633,13 +885,17 @@ void gbaCPU::T_ADD_REG(uint16_t opcode)
 
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF < (cpu.R[Rn] + cpu.R[Rm]));
+    cpu.cpsr.C = (0xFFFFFFFF < ((uint64_t)cpu.R[Rn] + (uint64_t)cpu.R[Rm]));
+    cpu.cpsr.V = ( ~ ( (uint64_t)cpu.R[Rd] ^ (uint64_t)cpu.R[Rm] ) &
+                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+                     0x80000000 ) != 0;
+
     cpu.R[Rd] = result;
     // MISSING V IMPLEMENTATION, SEE PG. 339
-    cpu.R[15] += 2;
 }
 void gbaCPU::T_SUB_REG(uint16_t opcode)
 {
+    cpu.R[15] += 2;
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t Rn = ((opcode >> 3) & 0x7);
     uint8_t Rm = ((opcode >> 6) & 0x7);
@@ -649,13 +905,16 @@ void gbaCPU::T_SUB_REG(uint16_t opcode)
 
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF >= (cpu.R[Rn] - cpu.R[Rm]));
+    cpu.cpsr.C = (0xFFFFFFFF >= ((uint64_t)cpu.R[Rn] - (uint64_t)cpu.R[Rm]));
+    cpu.cpsr.V = (( (uint64_t)cpu.R[Rd] ^ (uint64_t)cpu.R[Rm] ) &
+                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+                     0x80000000 ) != 0;
     cpu.R[Rd] = result;
     // MISSING V IMPLEMENTATION, SEE PG. 339
-    cpu.R[15] += 2;
 }
 void gbaCPU::T_MOV_IMD(uint16_t opcode)
 {
+    cpu.R[15] += 2;
     uint8_t Rd = ((opcode >> 8) & 0x7);
     uint8_t imdVal = (opcode & 0xFF);
 
@@ -666,13 +925,12 @@ void gbaCPU::T_MOV_IMD(uint16_t opcode)
     cpu.cpsr.Z = (result == 0);
     cpu.R[Rd] = result;
     // MISSING V IMPLEMENTATION, SEE PG. 339
-    cpu.R[15] += 2;
 }
 
 void gbaCPU::T_BL(uint16_t opcode)
 {
-    cpu.R[14] = cpu.R[15] - 2;
-    uint32_t fullOpcode = (io.readMem(cpu.R[15] - 4,1) << 16) | io.readMem(cpu.R[15] - 2,1);
+    cpu.R[14] = (cpu.R[15] + 4) | cpu.cpsr.T;
+    uint32_t fullOpcode = (io.readMem(cpu.R[15],1) << 16) | io.readMem(cpu.R[15] + 2,1);
     int32_t offset = opcode & 0x7FF;
     offset = offset << 12;
     offset = offset << 9; // Sign Extend
@@ -682,6 +940,16 @@ void gbaCPU::T_BL(uint16_t opcode)
     cpu.R[15] += offset2;
     cpu.R[15] += offset2;
     cpu.R[15] += 4;
+}
+
+void gbaCPU::T_BX(uint16_t opcode)
+{
+    // Does this cause error?
+    uint8_t Rm = ((opcode >> 3) & 0x7);
+    uint8_t highReg = ((opcode >> 6) & 0x1);
+    Rm = Rm + (highReg * 8);
+    cpu.cpsr.T = (cpu.R[Rm] & 0x1);
+    cpu.R[15] = (cpu.R[Rm] & 0xFFFFFFFE);
 }
 
 void gbaCPU::T_AND_ALU(uint16_t opcode)
@@ -701,7 +969,7 @@ void gbaCPU::T_BIC_ALU(uint16_t opcode)
 {
     uint8_t Rd = (opcode & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
-    uint32_t result = cpu.R[Rd] & (!cpu.R[Rm]);
+    uint32_t result = cpu.R[Rd] & (~cpu.R[Rm]);
 
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
@@ -714,7 +982,7 @@ void gbaCPU::T_MVN_ALU(uint16_t opcode)
 {
     uint8_t Rd = (opcode & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
-    uint32_t result = (!cpu.R[Rm]);
+    uint32_t result = (~cpu.R[Rm]);
 
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
@@ -780,7 +1048,7 @@ void gbaCPU::T_LSL_ALU(uint16_t opcode)
 {
     uint8_t Rd = (opcode & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
-    uint32_t result;
+    uint32_t result = 0;
 
     if((cpu.R[Rm] & 0xFF) == 0)
     {
@@ -813,7 +1081,7 @@ void gbaCPU::T_LSR_ALU(uint16_t opcode)
 {
     uint8_t Rd = (opcode & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
-    uint32_t result;
+    uint32_t result = 0;
 
     if((cpu.R[Rm] & 0xFF) == 0)
     {
@@ -888,8 +1156,10 @@ void gbaCPU::T_ADC_ALU(uint16_t opcode)
 
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF < (cpu.R[Rd] + cpu.R[Rm] + cpu.cpsr.C));
-    // MISSING V FLAG IMPLEMENTATION SEE PG. 308
+    cpu.cpsr.C = (0xFFFFFFFF < ((uint64_t)cpu.R[Rd] + (uint64_t)cpu.R[Rm] + (uint64_t)cpu.cpsr.C));
+    cpu.cpsr.V = ( ~ ( (uint64_t)cpu.R[Rd] ^ ( (uint64_t)cpu.R[Rm] + (uint64_t)cpu.cpsr.C ) ) &
+                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+                     0x80000000 ) != 0;
 
     cpu.R[Rd] = result;
     cpu.R[15] += 2;
@@ -905,8 +1175,10 @@ void gbaCPU::T_SBC_ALU(uint16_t opcode)
 
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF >= (cpu.R[Rd] - cpu.R[Rm] - (!cpu.cpsr.C)));
-    // MISSING V FLAG IMPLEMENTATION SEE PG. 308
+    cpu.cpsr.C = (0xFFFFFFFF >= ((uint64_t)cpu.R[Rd] - (uint64_t)cpu.R[Rm] - (uint64_t)(!cpu.cpsr.C)));
+    cpu.cpsr.V = ( ( (uint64_t)cpu.R[Rd] ^ ( (uint64_t)cpu.R[Rm] - (uint64_t)(!cpu.cpsr.C) ) ) &
+                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+                     0x80000000 ) != 0;
 
     cpu.R[Rd] = result;
     cpu.R[15] += 2;
@@ -922,8 +1194,10 @@ void gbaCPU::T_CMP_ALU(uint16_t opcode)
 
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF >= (cpu.R[Rd] - cpu.R[Rm]));
-    // MISSING V FLAG IMPLEMENTATION SEE PG. 308
+    cpu.cpsr.C = ((uint64_t)0xFFFFFFFF >= ((uint64_t)cpu.R[Rd] - (uint64_t)cpu.R[Rm]));
+    cpu.cpsr.V = (( (uint64_t)cpu.R[Rd] ^ (uint64_t)cpu.R[Rm] ) &
+                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+                     0x80000000 ) != 0;
 
     //cpu.R[Rd] = result;
     cpu.R[15] += 2;
@@ -939,8 +1213,10 @@ void gbaCPU::T_CMN_ALU(uint16_t opcode)
 
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF < (cpu.R[Rd] + cpu.R[Rm]));
-    // MISSING V FLAG IMPLEMENTATION SEE PG. 308
+    cpu.cpsr.C = ((uint64_t)0xFFFFFFFF < ((uint64_t)cpu.R[Rd] + (uint64_t)cpu.R[Rm]));
+    cpu.cpsr.V = ( ~ ( (uint64_t)cpu.R[Rd] ^ (uint64_t)cpu.R[Rm] ) &
+                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+                     0x80000000 ) != 0;
 
     //cpu.R[Rd] = result;
     cpu.R[15] += 2;
@@ -956,7 +1232,7 @@ void gbaCPU::T_NEG_ALU(uint16_t opcode)
 
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF >= (0 - cpu.R[Rm]));
+    cpu.cpsr.C = (0xFFFFFFFF >= ((uint64_t)0 - (uint64_t)cpu.R[Rm]));
     // MISSING V FLAG IMPLEMENTATION SEE PG. 377
 
     cpu.R[Rd] = result;
@@ -965,28 +1241,378 @@ void gbaCPU::T_NEG_ALU(uint16_t opcode)
 
 void gbaCPU::T_ROR_ALU(uint16_t opcode)
 {
+    //ui.pauseEmulation = true;
     uint8_t Rd = (opcode & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
+    //printf("RD: 0x%X\n", Rd);
+    //printf("RM: 0x%X\n", Rm);
+    //printf("RDval: 0x%X\n", cpu.R[Rd]);
+    //printf("RMval: 0x%X\n", cpu.R[Rm]);
     uint32_t result;
 
     if((cpu.R[Rm] & 0xFF) == 0)
     {
         result = cpu.R[Rd];
+        //printf("PATH 1 CHOSEN\n");
     }
-    if((cpu.R[Rm] & 0xF) == 0 && (cpu.R[Rm] & 0xFF) != 0)
+    //if((cpu.R[Rm] & 0xF) == 0 && (cpu.R[Rm] & 0xFF) != 0)
+    //{
+    //    cpu.cpsr.C = ( ( cpu.R[Rd] & 0x80000000 ) != 0);
+    //    result = cpu.R[Rd];
+    //}
+    else
     {
-        cpu.cpsr.C = ( ( cpu.R[Rd] & 0x80000000 ) != 0);
-        result = cpu.R[Rd];
-    }
-    if((cpu.R[Rm] & 0xF) > 0)
-    {
-        cpu.cpsr.C = (((cpu.R[Rd] >> ((cpu.R[Rm] & 0xF) - 1) ) & 0x1) != 0);
-        result = rotr32(cpu.R[Rd],(cpu.R[Rm] & 0xF));
+        //printf("PATH 2 CHOSEN\n");
+        cpu.cpsr.C = (((cpu.R[Rd] >> ((cpu.R[Rm] & 0x1F) - 1) ) & 0x1) != 0);
+        result = rotr32(cpu.R[Rd],(cpu.R[Rm] & 0x1F));
     }
 
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
+    //cpu.cpsr.N = 1;
 
     cpu.R[Rd] = result;
+    //printf("RESULT: 0x%X\n", result);
     cpu.R[15] += 2;
+}
+
+
+void gbaCPU::T_LDR_IMD(uint16_t opcode)
+{
+    uint8_t Rn = ((opcode >> 3) & 0x7);
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t imdVal = ((opcode >> 6) & 0x1F);
+
+    uint32_t address = cpu.R[Rn] + (imdVal * 4);
+    //address = address & 0xFFFFFFFC;
+    cpu.R[Rd] = io.readMem(address,2);
+    cpu.R[15] += 2;
+}
+void gbaCPU::T_LDST_REG(uint16_t opcode)
+{
+    uint8_t Ro = ((opcode >> 6) & 0x7);
+    uint8_t Rb = ((opcode >> 3) & 0x7);
+    uint8_t Rd = ((opcode) & 0x7);
+    bool L,B;
+    L = ((opcode >> 11) & 0x1);
+    B = ((opcode >> 10) & 0x1);
+
+    uint32_t address = cpu.R[Rb] + cpu.R[Ro];
+    switch((L << 1) | B)
+    {
+        case 0: // Store Word
+            io.writeMem(address, 2, cpu.R[Rd]);
+        break;
+
+        case 1: // Store Byte
+            io.writeMem(address, 0, cpu.R[Rd]);
+        break;
+
+        case 2: // Load Word
+            cpu.R[Rd] = io.readMem(address,2);
+        break;
+
+        case 3: // Load Byte
+            cpu.R[Rd] = io.readMem(address,0);
+        break;
+    }
+    cpu.R[15] += 2;
+}
+
+void gbaCPU::T_LDSTSBH_REG(uint16_t opcode)
+{
+    uint8_t Ro = ((opcode >> 6) & 0x7);
+    uint8_t Rb = ((opcode >> 3) & 0x7);
+    uint8_t Rd = ((opcode) & 0x7);
+    bool H,S;
+    H = ((opcode >> 11) & 0x1);
+    S = ((opcode >> 10) & 0x1);
+
+    uint32_t address = cpu.R[Rb] + cpu.R[Ro];
+    switch((S << 1) | H)
+    {
+        case 0:
+            io.writeMem(address, 1, cpu.R[Rd]);
+        break;
+
+        case 1:
+            cpu.R[Rd] = io.readMem(address,1);
+            //io.writeMem(address, 0, cpu.R[Rd]);
+        break;
+
+        case 2:
+            {
+                int32_t signExtend = io.readMem(address,0);
+                signExtend = signExtend << 24;
+                signExtend = signExtend >> 24;
+                cpu.R[Rd] = signExtend;
+            }
+        break;
+
+        case 3:
+            {
+                int32_t signExtend = io.readMem(address,1);
+                signExtend = signExtend << 16;
+                signExtend = signExtend >> 16;
+                cpu.R[Rd] = signExtend;
+            }
+        break;
+    }
+    cpu.R[15] += 2;
+}
+
+void gbaCPU::T_LDR_SP(uint16_t opcode)
+{
+    uint8_t Rd = ((opcode >> 8) & 0x7);
+    uint8_t imdVal = ((opcode) & 0xFF);
+
+    uint32_t address = cpu.R[13] + (imdVal * 4);
+    cpu.R[Rd] = io.readMem(address,2);
+    cpu.R[15] += 2;
+}
+
+void gbaCPU::T_LDRH_IMD(uint16_t opcode)
+{
+    uint8_t Rn = ((opcode >> 3) & 0x7);
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t imdVal = ((opcode >> 6) & 0x1F);
+
+    uint32_t address = cpu.R[Rn] + (imdVal * 2);
+    cpu.R[Rd] = io.readMem(address,1);
+    cpu.R[15] += 2;
+}
+void gbaCPU::T_LDRB_IMD(uint16_t opcode)
+{
+    uint8_t Rn = ((opcode >> 3) & 0x7);
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t imdVal = ((opcode >> 6) & 0x1F);
+    //printf("imdVAL: 0x%X\n", imdVal);
+
+    uint32_t address = cpu.R[Rn] + (imdVal);
+    cpu.R[Rd] = io.readMem(address,0);
+    cpu.R[15] += 2;
+}
+void gbaCPU::T_STR_IMD(uint16_t opcode)
+{
+    uint8_t Rn = ((opcode >> 3) & 0x7);
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t imdVal = ((opcode >> 6) & 0x1F);
+
+    uint32_t address = cpu.R[Rn] + (imdVal * 4);
+    io.writeMem(address,2,cpu.R[Rd]);
+    cpu.R[15] += 2;
+}
+
+void gbaCPU::T_STR_SP(uint16_t opcode)
+{
+    uint8_t Rd = ((opcode >> 8) & 0x7);
+    uint8_t imdVal = ((opcode) & 0xFF);
+
+    uint32_t address = cpu.R[13] + (imdVal * 4);
+    io.writeMem(address,2,cpu.R[Rd]);
+    if(Rd == 15)
+    {
+        io.writeMem(address,2,cpu.R[Rd] - 8);
+    }
+    cpu.R[15] += 2;
+}
+
+void gbaCPU::T_STRH_IMD(uint16_t opcode)
+{
+    uint8_t Rn = ((opcode >> 3) & 0x7);
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t imdVal = ((opcode >> 6) & 0x1F);
+
+    uint32_t address = cpu.R[Rn] + (imdVal * 2);
+    io.writeMem(address,1,cpu.R[Rd]);
+    cpu.R[15] += 2;
+}
+void gbaCPU::T_STRB_IMD(uint16_t opcode)
+{
+    uint8_t Rn = ((opcode >> 3) & 0x7);
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t imdVal = ((opcode >> 6) & 0x1F);
+
+    uint32_t address = cpu.R[Rn] + (imdVal);
+    io.writeMem(address,0,cpu.R[Rd]);
+    cpu.R[15] += 2;
+}
+
+void gbaCPU::T_PUSH(uint16_t opcode)
+{
+    uint16_t regList = (opcode & 0x1FF);
+
+    uint8_t setBits = 0;
+    bool setBitArray[9];
+    for(int i = 0; i < 9; i++)
+    {
+        setBitArray[i] = false;
+        if(((regList >> i) & 0x1) != 0)
+        {
+            setBits++;
+            setBitArray[i] = true;
+        }
+    }
+    uint32_t startAddress = (cpu.R[13] - 4 *(setBits));
+    //uint32_t endAddress = cpu.R[13] - 4;
+
+
+    for(int i = 0; i < 9; i++)
+    {
+        if(setBitArray[i] == true && i != 8)
+        {
+            io.writeMem(startAddress, 2, cpu.R[i]);
+            startAddress += 4;
+        }
+        if(setBitArray[i] == true && i == 8)
+        {
+            io.writeMem(startAddress, 2, cpu.R[14]);
+            startAddress += 4;
+        }
+    }
+    cpu.R[13] = cpu.R[13] - 4*(setBits);
+    cpu.R[15] += 2;
+}
+
+void gbaCPU::T_POP(uint16_t opcode)
+{
+    uint16_t regList = (opcode & 0x1FF);
+
+    uint8_t setBits = 0;
+    bool setBitArray[9];
+    for(int i = 0; i < 9; i++)
+    {
+        setBitArray[i] = false;
+        if(((regList >> i) & 0x1) != 0)
+        {
+            setBits++;
+            setBitArray[i] = true;
+        }
+    }
+    uint32_t startAddress = cpu.R[13];
+    uint32_t endAddress = cpu.R[13] + 4 * (setBits);
+
+    for(int i = 0; i < 9; i++)
+    {
+        if(setBitArray[i] == true && i != 8)
+        {
+            cpu.R[i] = io.readMem(startAddress, 2);
+            startAddress += 4;
+        }
+        if(setBitArray[i] == true && i == 8)
+        {
+            cpu.R[15] = io.readMem(startAddress, 2);
+            startAddress += 4;
+        }
+    }
+    cpu.R[13] = endAddress;
+    if(setBitArray[8] == false)
+    {
+        cpu.R[15] += 2;
+    }
+}
+
+void gbaCPU::T_SDP_ADD(uint16_t opcode)
+{
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t Rm = ((opcode >> 3) & 0x7);
+    uint8_t H2 = ((opcode >> 6) & 0x1);
+    uint8_t H1 = ((opcode >> 7) & 0x1);
+    Rd = Rd + (H1 * 8);
+    Rm = Rm + (H2 * 8);
+    cpu.R[Rd] = cpu.R[Rd] + cpu.R[Rm];
+    if(Rm == 0xF)
+    {
+        cpu.R[Rd] += 4;
+    }
+    if(Rd == 0xF)
+    {
+        cpu.R[Rd] += 4;
+    }
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 2;
+    }
+}
+
+void gbaCPU::T_SDP_CMP(uint16_t opcode)
+{
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t Rm = ((opcode >> 3) & 0x7);
+    uint8_t H2 = ((opcode >> 6) & 0x1);
+    uint8_t H1 = ((opcode >> 7) & 0x1);
+    Rd = Rd + (H1 * 8);
+    Rm = Rm + (H2 * 8);
+    uint32_t result = cpu.R[Rd] - cpu.R[Rm];
+    if(Rm == 0xF)
+    {
+        result -= 4;
+    }
+    if(Rd == 0xF)
+    {
+        result += 4;
+    }
+
+    cpu.cpsr.N = ((result & 0x80000000) != 0);
+    cpu.cpsr.Z = (result == 0);
+    cpu.cpsr.C = ((uint64_t)0xFFFFFFFF >= ((uint64_t)cpu.R[Rd] - (uint64_t)cpu.R[Rm]));
+    cpu.cpsr.V = (( (uint64_t)cpu.R[Rd] ^ (uint64_t)cpu.R[Rm] ) &
+                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+                     0x80000000 ) != 0;
+    cpu.R[15] += 2;
+}
+
+void gbaCPU::T_SDP_MOV(uint16_t opcode)
+{
+    uint8_t Rd = ((opcode) & 0x7);
+    uint8_t Rm = ((opcode >> 3) & 0x7);
+    uint8_t H2 = ((opcode >> 6) & 0x1);
+    uint8_t H1 = ((opcode >> 7) & 0x1);
+    Rd = Rd + (H1 * 8);
+    Rm = Rm + (H2 * 8);
+    cpu.R[Rd] = cpu.R[Rm];
+    if(Rm == 0xF)
+    {
+        cpu.R[Rd] += 4;
+    }
+    if(Rd != 0xF)
+    {
+        cpu.R[15] += 2;
+    }
+}
+
+void gbaCPU::T_ADJ_STACK(uint16_t opcode)
+{
+    bool S = ((opcode >> 7) & 0x1);
+    uint16_t offset = (opcode & 0x7F);
+    offset = offset << 2;
+    switch(S)
+    {
+        case 0:
+            cpu.R[13] += offset;
+        break;
+
+        case 1:
+            cpu.R[13] -= offset;
+        break;
+    }
+    cpu.R[15] += 2;
+}
+
+void gbaCPU::T_SWI(uint16_t opcode)
+{
+    cpu.R1314_svc[1] = (cpu.R[15] + 2);
+    cpu.spsr_svc = cpu.cpsr;
+    cpu.R[15] = 0x8;
+    cpu.cpsr.T = false;
+    cpu.cpsr.I = true;
+    modeSwitch(0x13);
+    cpu.cpsr.mode = 0x13;
+
+    if((opcode & 0xFF) == 0xC)
+    {
+        return;
+    }
+    //printf("RUNNING SOFTWARE INTERRUPT 0x%X\n",(opcode & 0xFF));
+    //ui.pauseEmulation = true;
 }

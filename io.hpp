@@ -21,6 +21,8 @@ class gbaRAM
 
         uint8_t save[0x10000]; // 0x0E000000 - 0x0E00FFFF
         // 0E010000 - FFFFFFFF UNUSED
+
+        bool openBusEnable;
 };
 
 
@@ -30,19 +32,26 @@ class gbaIO {
     public:
 
         uint16_t lcdControl;
+        bool lcdControlUpdated;
+        uint16_t dispStat;
+
+
         uint32_t dmaStartAddress[4];
         uint32_t dmaEndAddress[4];
         uint16_t dmaWordCount[4];
-        uint16_t dmaControl0;
-        uint16_t dmaControl1;
-        uint16_t dmaControl2;
-        uint16_t dmaControl3;
+        uint16_t dmaControl[4];
+
+
         uint16_t LY;
+
+
         bool IME;
-        bool HALTCNT;
-        bool currentlyHalted;
         uint16_t IE;
         uint16_t IF;
+
+        bool HALTCNT;
+        bool currentlyHalted;
+
         uint16_t bgCNT[4];
         uint16_t bgXScroll[4];
         uint16_t bgYScroll[4];
@@ -50,6 +59,8 @@ class gbaIO {
 
         uint16_t SOUNDCNT_H[4];
         uint16_t SOUNDCNT_HD;
+
+        uint16_t KEYINPUT;
 
         uint16_t TMCNT_L[4]; // Reload
         uint16_t TMCNT_H[4]; // Control
@@ -60,7 +71,7 @@ class gbaIO {
         //uint32_t readRAM();
         uint32_t get32bitOpcode(uint32_t location);
         uint32_t readMem(uint32_t location, uint8_t mode);
-        uint32_t writeMem(uint32_t location, uint8_t mode, uint32_t value);
+        void writeMem(uint32_t location, uint8_t mode, uint32_t value);
     private:
 };
 
