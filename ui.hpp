@@ -30,6 +30,8 @@ class gbaUI {
         bool displayError;
 
         void registerWindow();
+        void dmaWindow();
+        void dispRegWindow();
         void intRegisterWindow();
 
         void displayViewer();

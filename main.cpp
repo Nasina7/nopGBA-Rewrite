@@ -7,8 +7,42 @@
 
 using namespace std;
 
+time_t seconds2;
+
+uint64_t secondsPassed2 = 0;
+
 int main()
 {
+
+    /*
+    bool readMemBench = false;
+    uint32_t readMemLoc = 0;
+    uint64_t readMemAmount = 0;
+
+    while(!readMemBench)
+    {
+        io.readMem(readMemLoc, 2);
+        readMemLoc++;
+        readMemAmount++;
+        if(readMemAmount == 0xFFFFFFFFFFFFFFFF)
+        {
+            printf("Overflow!\n");
+        }
+        if(seconds2 != time(NULL))
+        {
+            secondsPassed2++;
+            if(secondsPassed2 == 5)
+            {
+                readMemBench = true;
+            }
+        }
+        seconds2 = time(NULL);
+    }
+
+    printf("Readmems Sucessfully Ran: %i\n", readMemAmount);
+
+    return 0;
+    */
     /*
     if(!fileLoad.loadBIOS())
     {
@@ -21,6 +55,7 @@ int main()
         return 1;
     }
     */
+    cpu.generateThumbLookup();
     cpu.opcodesRan = 0;
     ui.initUI();
     ui.startEmulation = false;
@@ -29,6 +64,9 @@ int main()
         ui.handleUI();
         input.handleInput();
     }
+
+    //printf("TEST: 0x%X\n", io.readMem(0x080000C0, 2));
+    //return 0;
     //cpu.doOpcode();
     //printf("0x%X\n",cpu.R[15]);
     //return 0;
@@ -56,8 +94,10 @@ int main()
             break;
         }
         cpu.opcodesRan++;
-        cpu.handleDMA();
-        cpu.doInterrupts();
+        if(cpu.opcodesRan % (opPerFrame / 260) == 0)
+        {
+            cpu.doInterrupts();
+        }
         switch(cpu.cpsr.T)
         {
             case 0:
@@ -70,6 +110,7 @@ int main()
         }
         if(cpu.opcodesRan % opPerFrame == 0)
         {
+            SDL_PauseAudio(0);
             if(((io.dispStat) & 0x8) != 0)
             {
                 io.IF = io.IF | 0x1;

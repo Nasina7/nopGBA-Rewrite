@@ -3,6 +3,7 @@
 #include "file.hpp"
 #include "display.hpp"
 #include "cpu.hpp"
+#include "audio.hpp"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl.h"
 #include "string"
@@ -51,11 +52,20 @@ void gbaUI::createErrorWindow(const char* message, uint32_t argument)
 
 int gbaUI::initUI()
 {
-    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0)
+    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) != 0)
     {
         printf("Error: %s\n", SDL_GetError());
         return -1;
     }
+    audio.want.freq = 32768;
+    audio.want.format = AUDIO_U16;
+    audio.want.channels = 1;
+    audio.want.samples = 16 * 4; // 16 * 4
+    audio.want.callback = audioCallback;
+    audio.dev = SDL_OpenAudioDevice(NULL, 0, &audio.want, &audio.have, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+    SDL_OpenAudio(&audio.want, &audio.have);
+
+
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -93,6 +103,54 @@ void gbaUI::errorWindow()
     ImGui::End();
 }
 
+void gbaUI::dispRegWindow()
+{
+    ImGui::Begin("BG Regs");
+    ImGui::InputScalar("LCD Control: ", ImGuiDataType_U16, &io.lcdControl, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+    for(int i = 0; i < 4; i++)
+    {
+        ImGui::Text("BG Regs");
+        ImGui::InputScalar("Background Control: ", ImGuiDataType_U16, &io.bgCNT[i], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+    }
+    ImGui::End();
+
+
+
+
+
+    ImGui::Begin("owie my ears");
+
+    float sampleArray[16];
+    for(int x = 0; x < 16; x++)
+    {
+        sampleArray[x] = audio.samples[x];
+    }
+    ImGui::PlotLines("Audio Data", sampleArray, 16);
+
+    ImGui::End();
+
+
+}
+
+void gbaUI::dmaWindow()
+{
+    ImGui::Begin("DMA Regs");
+    for(int i = 0; i < 4; i++)
+    {
+        ImGui::Text("DMA");
+        ImGui::InputScalar("Start Address: ", ImGuiDataType_U32, &io.dmaStartAddress[i], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::InputScalar("End Address: ", ImGuiDataType_U32, &io.dmaEndAddress[i], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::InputScalar("Word Count: ", ImGuiDataType_U16, &io.dmaWordCount[i], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::InputScalar("Control: ", ImGuiDataType_U16, &io.dmaControl[i], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::InputScalar("Last Start Addr: ", ImGuiDataType_U32, &io.lastStartAddr[i], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+    }
+    ImGui::InputScalar("DATA: ", ImGuiDataType_U8, &audio.samples[0], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::InputScalar("Sample Per Frame: ", ImGuiDataType_U32, &audio.averageFreqPerFrame, NULL, NULL, "%i", ImGuiInputTextFlags_CharsDecimal);
+    audio.averageFreqPerFrame = 0;
+    audio.frameSampleCount = 0;
+    ImGui::End();
+}
+
 void gbaUI::registerWindow()
 {
     ImGui::Begin("Registers");
@@ -122,6 +180,12 @@ void gbaUI::registerWindow()
     ImGui::Checkbox("Thumb Mode",&cpu.cpsr.T);
     ImGui::InputScalar("Mode", ImGuiDataType_U8, &cpu.cpsr.mode, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
     ImGui::InputScalar("Last Opcode:", ImGuiDataType_U32, &cpu.lastOpcodeRan, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+
+    for(int i = 0; i < 0x10; i++)
+    {
+        ImGui::InputScalar("Section:", ImGuiDataType_U64, &ram.accessTest[i], NULL, NULL, "%i", ImGuiInputTextFlags_CharsDecimal);
+    }
+
     ImGui::End();
 }
 
@@ -397,6 +461,11 @@ void gbaUI::displayViewer()
 
 
     ImGui::Image((void*)(intptr_t)screenView,ImVec2(240 * 2,160 * 2));
+    ImGui::Checkbox("Force Draw BGs: ", &screen.forceDrawBGs);
+    ImGui::Checkbox("Force Draw BG 0: ", &screen.forceDrawBg[0]);
+    ImGui::Checkbox("Force Draw BG 1: ", &screen.forceDrawBg[1]);
+    ImGui::Checkbox("Force Draw BG 2: ", &screen.forceDrawBg[2]);
+    ImGui::Checkbox("Force Draw BG 3: ", &screen.forceDrawBg[3]);
     //printf("Exit 6 Loop\n");
     ImGui::End();
     //printf("Successfully Wrote Screen\n");
@@ -414,7 +483,9 @@ void gbaUI::handleUI()
     ImGui::NewFrame();
 
 
-    testWindow();
+    //testWindow();
+    dmaWindow();
+    dispRegWindow();
     registerWindow();
     intRegisterWindow();
     palViewer();
@@ -441,7 +512,7 @@ void gbaUI::handleUI()
         secondsPassed++;
         if(secondsPassed == 15)
         {
-            endEmulator = true;
+            //endEmulator = true;
         }
     }
     seconds = time(NULL);

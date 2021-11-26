@@ -7,6 +7,9 @@ class gbaDisplay {
         void drawScreenMode4();
         uint32_t screenArray[160][240];
 
+        bool forceDrawBGs;
+        bool forceDrawBg[4];
+
     private:
         void drawBGMode0(uint8_t bgNum);
         void drawSprites();

@@ -5,17 +5,433 @@
 
 void gbaCPU::decodeAndRunTHUMB()
 {
-    uint16_t opcode = io.readMem(cpu.R[15], 1);
-    cpu.lastOpcodeRan = opcode;
+    //uint16_t opcode = io.readMem(cpu.R[15], 1);
+    //cpu.lastOpcodeRan = io.readMem(cpu.R[15], 1);
     //printf("Opcode: 0x%X\n",opcode);
-    cpu.runTHUMB(opcode);
+    cpu.runTHUMB(io.readMem(cpu.R[15], 1));
+}
+typedef void (gbaCPU::*thumbLookup2)(short unsigned int);
+
+thumbLookup2 thumbLookupTable[0x10000];
+
+thumbLookup2 getThumbOpcode(uint16_t opcode)
+{
+    switch((opcode) & 0xE000)
+    {
+        case 0x0:
+            switch((opcode >> 10) & 0x7)
+            {
+                case 0 ... 5: // 000-??X Shift by Immediate
+                    switch((opcode >> 11) & 0x3)
+                    {
+                        case 0: // LSL
+                            return &gbaCPU::T_LSL_IMD;
+                        break;
+
+                        case 1: // LSR
+                            return &gbaCPU::T_LSR_IMD;
+                        break;
+
+                        case 2: // ASR
+                            return &gbaCPU::T_ASR_IMD;
+                        break;
+
+                        default:
+                            return &gbaCPU::T_INVALID;
+                        break;
+                    }
+                break;
+
+                case 6: // 000-110 Add Subtract Register
+                    switch((opcode >> 9) & 0x1)
+                    {
+                        case 0: // Add
+                            return &gbaCPU::T_ADD_REG;
+                        break;
+
+                        case 1: // Sub
+                            return &gbaCPU::T_SUB_REG;
+                        break;
+                    }
+                break;
+
+                case 7: // 000-111 Add Subtract Immediate
+                    switch((opcode >> 9) & 0x1)
+                    {
+                        case 0: // Add
+                            return &gbaCPU::T_ADD_SIMD;
+                        break;
+
+                        case 1: // Sub
+                            return &gbaCPU::T_SUB_SIMD;
+                        break;
+                    }
+                break;
+            }
+        break;
+
+        case 0x2000:
+            switch((opcode >> 11) & 0x3)
+            {
+                case 0: // MOV
+                    return &gbaCPU::T_MOV_IMD;
+                break;
+
+                case 1: // CMP
+                    return &gbaCPU::T_CMP_IMD;
+                break;
+
+                case 2: // ADD
+                    return &gbaCPU::T_ADD_IMD;
+                break;
+
+                case 3: // SUB
+                    return &gbaCPU::T_SUB_IMD;
+                break;
+            }
+        break;
+
+        case 0x4000: // 010
+            switch((opcode >> 10) & 0x7)
+            {
+                case 0: // 010-000  Data Processing Register
+                    switch((opcode >> 6) & 0xF)
+                    {
+                        case 0:
+                            return &gbaCPU::T_AND_ALU;
+                        break;
+
+                        case 1:
+                            return &gbaCPU::T_EOR_ALU;
+                        break;
+
+                        case 2:
+                            return &gbaCPU::T_LSL_ALU;
+                        break;
+
+                        case 3:
+                            return &gbaCPU::T_LSR_ALU;
+                        break;
+
+                        case 4:
+                            return &gbaCPU::T_ASR_ALU;
+                        break;
+
+                        case 5:
+                            return &gbaCPU::T_ADC_ALU;
+                        break;
+
+                        case 6:
+                            return &gbaCPU::T_SBC_ALU;
+                        break;
+
+                        case 7:
+                            return &gbaCPU::T_ROR_ALU;
+                        break;
+
+                        case 8:
+                            return &gbaCPU::T_TST_ALU;
+                        break;
+
+                        case 9:
+                            return &gbaCPU::T_NEG_ALU;
+                        break;
+
+                        case 0xA:
+                            return &gbaCPU::T_CMP_ALU;
+                        break;
+
+                        case 0xB:
+                            return &gbaCPU::T_CMN_ALU;
+                        break;
+
+                        case 0xC:
+                            return &gbaCPU::T_ORR_ALU;
+                        break;
+
+                        case 0xD:
+                            return &gbaCPU::T_MUL_ALU;
+                        break;
+
+                        case 0xE:
+                            return &gbaCPU::T_BIC_ALU;
+                        break;
+
+                        case 0xF:
+                            return &gbaCPU::T_MVN_ALU;
+                        break;
+                    }
+                break;
+
+                case 1: // 010-001  Special Data Processing or Branch Exchange
+                    switch((opcode >> 8) & 0x3)
+                    {
+                        case 0:
+                            return &gbaCPU::T_SDP_ADD;
+                        break;
+
+                        case 1:
+                            return &gbaCPU::T_SDP_CMP;
+                        break;
+
+                        case 2:
+                            return &gbaCPU::T_SDP_MOV;
+                        break;
+
+                        case 3:
+                            return &gbaCPU::T_BX;
+                        break;
+
+                        default:
+                            return &gbaCPU::T_INVALID;
+                        break;
+                    }
+                break;
+
+                case 2 ... 3: // 010-01X  Load from Literal Pool
+                    return &gbaCPU::T_LD_LP;
+                break;
+
+                case 4 ... 7: // 010-1XX  Load Store Register Offset
+                    switch((opcode >> 9) & 0x1)
+                    {
+                        case 0:
+                            return &gbaCPU::T_LDST_REG;
+                        break;
+
+                        case 1:
+                            return &gbaCPU::T_LDSTSBH_REG;
+                        break;
+                    }
+
+                break;
+            }
+        break;
+
+        case 0x6000: // Lost store word/byte immediate offset
+            switch((opcode >> 11) & 0x3)
+            {
+                case 0: // STR
+                    return &gbaCPU::T_STR_IMD;
+                break;
+
+                case 1: // LDR
+                    return &gbaCPU::T_LDR_IMD;
+                break;
+
+                case 2: // STRB
+                    return &gbaCPU::T_STRB_IMD;
+                break;
+
+                case 3: // LDRB
+                    return &gbaCPU::T_LDRB_IMD;
+                break;
+            }
+        break;
+
+        case 0x8000:
+            switch((opcode >> 11) & 0x3)
+            {
+                case 0:
+                    return &gbaCPU::T_STRH_IMD;
+                break;
+
+                case 1:
+                    return &gbaCPU::T_LDRH_IMD;
+                break;
+
+                case 2:
+                    return &gbaCPU::T_STR_SP;
+                break;
+
+                case 3:
+                    return &gbaCPU::T_LDR_SP;
+                break;
+            }
+        break;
+
+        case 0xA000:
+            switch((opcode >> 12) & 0x1)
+            {
+                case 0: // Add to SP or PC
+                    switch((opcode >> 11) & 0x1)
+                    {
+                        case 0: // Add to PC and store in Rd
+                            return &gbaCPU::T_ADD_PC;
+                        break;
+
+                        case 1: // Add to SP and store in Rd
+                            return &gbaCPU::T_ADD_SP;
+                        break;
+                    }
+                break;
+
+                case 1: // Misc Instructions
+                    switch((opcode >> 9) & 0x3)
+                    {
+                        case 0:
+                            return &gbaCPU::T_ADJ_STACK;
+                        break;
+
+                        case 2: // Push/Pop Register List
+                            switch((opcode >> 11) & 0x1)
+                            {
+                                case 0: // PUSH
+                                    return &gbaCPU::T_PUSH;
+                                break;
+
+                                case 1: // POP
+                                    return &gbaCPU::T_POP;
+                                break;
+                            }
+                        break;
+
+                        case 3:
+                            return &gbaCPU::T_INVALID;
+                        break;
+
+                        default:
+                            return &gbaCPU::T_INVALID;
+                        break;
+                    }
+                break;
+            }
+        break;
+
+        case 0xC000: // 110
+            switch((opcode >> 8) & 0x1F)
+            {
+                case 0x0 ... 0xF: // 110-0XXXX Load Store Multiple
+                    switch((opcode >> 11) & 0x1)
+                    {
+                        case 0: // STMIA
+                            return &gbaCPU::T_STMIA;
+                        break;
+
+                        case 1: // LDMIA
+                            return &gbaCPU::T_LDMIA;
+                        break;
+                    }
+                break;
+
+                case 0x10 ... 0x1D: // Conditional Branch
+                    switch((opcode >> 8) & 0xF)
+                    {
+                        case 0:
+                            return &gbaCPU::T_B_EQ;
+                        break;
+
+                        case 1:
+                            return &gbaCPU::T_B_NE;
+                        break;
+
+                        case 2:
+                            return &gbaCPU::T_B_CS;
+                        break;
+
+                        case 3:
+                            return &gbaCPU::T_B_CC;
+                        break;
+
+                        case 4:
+                            return &gbaCPU::T_B_MI;
+                        break;
+
+                        case 5:
+                            return &gbaCPU::T_B_PL;
+                        break;
+
+                        case 6:
+                            return &gbaCPU::T_B_VS;
+                        break;
+
+                        case 7:
+                            return &gbaCPU::T_B_VC;
+                        break;
+
+                        case 8:
+                            return &gbaCPU::T_B_HI;
+                        break;
+
+                        case 9:
+                            return &gbaCPU::T_B_LS;
+                        break;
+
+                        case 0xA:
+                            return &gbaCPU::T_B_GE;
+                        break;
+
+                        case 0xB:
+                            return &gbaCPU::T_B_LT;
+                        break;
+
+                        case 0xC:
+                            return &gbaCPU::T_B_GT;
+                        break;
+
+                        case 0xD:
+                            return &gbaCPU::T_B_LE;
+                        break;
+
+                        default:
+                            return &gbaCPU::T_INVALID;
+                        break;
+                    }
+                break;
+
+                case 0x1E: // Undefined Instruction
+                    return &gbaCPU::T_INVALID;
+                break;
+
+                case 0x1F: // Software Interrupt
+                    return &gbaCPU::T_SWI;
+                break;
+            }
+        break;
+
+        case 0xE000:
+            switch((opcode >> 11) & 3)
+            {
+                case 0: // Unconditional Branch
+                    return &gbaCPU::T_B;
+                break;
+
+                case 1: // BLX Suffix or Undefined Instruction
+                    return &gbaCPU::T_INVALID;
+                break;
+
+                case 2: // BL Prefix
+                    return &gbaCPU::T_BL;
+                break;
+
+                case 3: // BL Suffix
+                    return &gbaCPU::T_INVALID;
+                break;
+            }
+        break;
+
+        default:
+            return &gbaCPU::T_INVALID;
+        break;
+    }
+}
+
+void gbaCPU::generateThumbLookup()
+{
+    for(uint32_t i = 0; i < 0x10000; i++)
+    {
+        thumbLookupTable[i] = getThumbOpcode(i);
+    }
 }
 
 void gbaCPU::runTHUMB(uint16_t opcode)
 {
-    switch((opcode >> 13) & 0x7)
+    (cpu.*thumbLookupTable[opcode])(opcode);
+    //(cpu->(*thumbLookupTable[opcode]))(opcode);
+    return;
+    switch((opcode) & 0xE000)
     {
-        case 0:
+        case 0x0:
             switch((opcode >> 10) & 0x7)
             {
                 case 0 ... 5: // 000-??X Shift by Immediate
@@ -68,7 +484,7 @@ void gbaCPU::runTHUMB(uint16_t opcode)
             }
         break;
 
-        case 1:
+        case 0x2000:
             switch((opcode >> 11) & 0x3)
             {
                 case 0: // MOV
@@ -89,7 +505,7 @@ void gbaCPU::runTHUMB(uint16_t opcode)
             }
         break;
 
-        case 2: // 010
+        case 0x4000: // 010
             switch((opcode >> 10) & 0x7)
             {
                 case 0: // 010-000  Data Processing Register
@@ -207,7 +623,7 @@ void gbaCPU::runTHUMB(uint16_t opcode)
             }
         break;
 
-        case 3: // Lost store word/byte immediate offset
+        case 0x6000: // Lost store word/byte immediate offset
             switch((opcode >> 11) & 0x3)
             {
                 case 0: // STR
@@ -228,38 +644,28 @@ void gbaCPU::runTHUMB(uint16_t opcode)
             }
         break;
 
-        case 4:
-            switch((opcode >> 12) & 0x1)
+        case 0x8000:
+            switch((opcode >> 11) & 0x3)
             {
                 case 0:
-                    switch((opcode >> 11) & 0x1)
-                    {
-                        case 0: // STRH
-                            cpu.T_STRH_IMD(opcode);
-                        break;
-
-                        case 1: // LDRH
-                            cpu.T_LDRH_IMD(opcode);
-                        break;
-                    }
+                    cpu.T_STRH_IMD(opcode);
                 break;
 
-                case 1: // Load/Store to/from stack
-                    switch((opcode >> 11) & 0x1)
-                    {
-                        case 0: // STR
-                            cpu.T_STR_SP(opcode);
-                        break;
+                case 1:
+                    cpu.T_LDRH_IMD(opcode);
+                break;
 
-                        case 1: // LDR
-                            cpu.T_LDR_SP(opcode);
-                        break;
-                    }
+                case 2:
+                    cpu.T_STR_SP(opcode);
+                break;
+
+                case 3:
+                    cpu.T_LDR_SP(opcode);
                 break;
             }
         break;
 
-        case 5:
+        case 0xA000:
             switch((opcode >> 12) & 0x1)
             {
                 case 0: // Add to SP or PC
@@ -310,7 +716,7 @@ void gbaCPU::runTHUMB(uint16_t opcode)
             }
         break;
 
-        case 6: // 110
+        case 0xC000: // 110
             switch((opcode >> 8) & 0x1F)
             {
                 case 0x0 ... 0xF: // 110-0XXXX Load Store Multiple
@@ -403,7 +809,7 @@ void gbaCPU::runTHUMB(uint16_t opcode)
             }
         break;
 
-        case 7:
+        case 0xE000:
             switch((opcode >> 11) & 3)
             {
                 case 0: // Unconditional Branch
@@ -1377,8 +1783,8 @@ void gbaCPU::T_LDRH_IMD(uint16_t opcode)
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t imdVal = ((opcode >> 6) & 0x1F);
 
-    uint32_t address = cpu.R[Rn] + (imdVal * 2);
-    cpu.R[Rd] = io.readMem(address,1);
+    //uint32_t address = cpu.R[Rn] + (imdVal * 2);
+    cpu.R[Rd] = io.readMem(cpu.R[Rn] + (imdVal << 1),1);
     cpu.R[15] += 2;
 }
 void gbaCPU::T_LDRB_IMD(uint16_t opcode)
@@ -1613,6 +2019,14 @@ void gbaCPU::T_SWI(uint16_t opcode)
     {
         return;
     }
+    //printf("RUNNING SOFTWARE INTERRUPT 0x%X\n",(opcode & 0xFF));
+    //ui.pauseEmulation = true;
+}
+
+void gbaCPU::T_INVALID(uint16_t opcode)
+{
+    printf("Unknown Thumb Opcode 0x%X\n", opcode);
+    ui.pauseEmulation = true;
     //printf("RUNNING SOFTWARE INTERRUPT 0x%X\n",(opcode & 0xFF));
     //ui.pauseEmulation = true;
 }

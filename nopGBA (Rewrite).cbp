@@ -17,11 +17,11 @@
 					<Add option="-g" />
 				</Compiler>
 				<Linker>
-					<Add option="-pg" />
 					<Add option="-lSDL2" />
 					<Add option="-lGLU" />
 					<Add option="-lGL" />
 					<Add option="-lGLEW" />
+					<Add option="-pg" />
 				</Linker>
 			</Target>
 			<Target title="Release">
@@ -63,6 +63,8 @@
 			<Option virtualFolder="imgui/" />
 		</Unit>
 		<Unit filename="arm.cpp" />
+		<Unit filename="audio.cpp" />
+		<Unit filename="audio.hpp" />
 		<Unit filename="cpu.cpp" />
 		<Unit filename="cpu.hpp" />
 		<Unit filename="display.cpp" />

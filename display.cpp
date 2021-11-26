@@ -282,7 +282,7 @@ void gbaDisplay::drawBGMode0(uint8_t bgNum)
     if(bgNum == 0xFF)
     {
 
-        uint16_t color = io.readMem(0x05000000, 1);
+        uint16_t color = ram.bg_ObjPal[0x1] << 8 | ram.bg_ObjPal[0];
         //printf("CLR\n");
         for(int y = 0; y < 160; y++)
         {
@@ -298,8 +298,17 @@ void gbaDisplay::drawBGMode0(uint8_t bgNum)
     }
     if( ( ( io.lcdControl >> (8 + bgNum) ) & 0x1 ) == 0)
     {
+        if(forceDrawBGs == false)
+        {
+            return;
+        }
+
+    }
+    if(forceDrawBGs == true && forceDrawBg[bgNum] == false)
+    {
         return;
     }
+
     uint8_t bg0priority = ((io.bgCNT[bgNum]) & 0x3);
     uint8_t bg0charBlock = ((io.bgCNT[bgNum] >> 2) & 0x3);
     bool bg0bpp = ((io.bgCNT[bgNum] >> 7) & 1);
@@ -388,9 +397,19 @@ void gbaDisplay::drawBGMode0(uint8_t bgNum)
             //yAmount %= (yMod * 0x80);
             uint32_t curTileLocation = bg0mapLocation + xAmount + yAmount;
             //(yTile * 0x400) + (xTile * 0x40) + (y * 8) + (x * 1);
-
             uint16_t tileData = io.readMem(curTileLocation, 1);
+            uint16_t prevTileData = tileData;
+            //curTileLocation &= 0x17FFE;
 
+
+            //tileData = ram.video[curTileLocation + 1] << 8 | ram.video[curTileLocation];
+
+            //if(prevTileData != tileData)
+            //{
+                //printf("curTileLocation: 0x%X  Correct: 0x%X  Broken: 0x%X  BGMAP: 0x%X\nSomeones being a little sussy...", curTileLocation, prevTileData, tileData, bg0mapBlock);
+
+            //}
+            //tileData = ((uint16_t *)(ram.video + curTileLocation ))[0];
 
 
             for(int y = 0; y != 8; y += 1)

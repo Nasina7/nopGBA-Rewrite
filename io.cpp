@@ -1,5 +1,6 @@
 #include "io.hpp"
 #include "cpu.hpp"
+#include "audio.hpp"
 #include <stdio.h>
 
 gbaIO io;
@@ -14,6 +15,16 @@ gbaRAM ram;
 #define objLocation 0x07000000 ... 0x070003FF
 #define romLocation 0x08000000 ... 0x0DFFFFFF
 #define saveLocation 0x0E000000 ... 0x0E00FFFF
+
+#define biosLocationB 0x0
+#define onBoardLocationB 0x2
+#define onChipLocationB 0x3
+#define ioLocatonB 0x4
+#define palLocationB 0x5
+#define videoLocationB 0x6
+#define objLocationB 0x7
+#define romLocationB 0x08 ... 0x0D
+#define saveLocationB 0xE
 /*
 #define biosLocation 0
 #define onBoardLocation 2
@@ -47,7 +58,7 @@ uint32_t gbaIO::get32bitOpcode(uint32_t location)
     }
 }
 
-uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool write)
+uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool write)
 {
 
     switch(location)
@@ -98,11 +109,19 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
             switch(write)
             {
                 case false:
+                    if(mode == 2)
+                    {
+                        return io.bgCNT[1] << 8 | io.bgCNT[0];
+                    }
                     return io.bgCNT[0];
                 break;
 
                 case true:
                     io.bgCNT[0] = value;
+                    if(mode == 2)
+                    {
+                        io.bgCNT[1] = value >> 16;
+                    }
                     //io.lcdControlUpdated = true;
                 break;
             }
@@ -112,11 +131,19 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
             switch(write)
             {
                 case false:
+                    if(mode == 2)
+                    {
+                        return io.bgCNT[2] << 8 | io.bgCNT[1];
+                    }
                     return io.bgCNT[1];
                 break;
 
                 case true:
                     io.bgCNT[1] = value;
+                    if(mode == 2)
+                    {
+                        io.bgCNT[2] = value >> 16;
+                    }
                     //io.lcdControlUpdated = true;
                 break;
             }
@@ -126,11 +153,19 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
             switch(write)
             {
                 case false:
+                    if(mode == 2)
+                    {
+                        return io.bgCNT[3] << 8 | io.bgCNT[2];
+                    }
                     return io.bgCNT[2];
                 break;
 
                 case true:
                     io.bgCNT[2] = value;
+                    if(mode == 2)
+                    {
+                        io.bgCNT[3] = value >> 16;
+                    }
                     //io.lcdControlUpdated = true;
                 break;
             }
@@ -140,11 +175,19 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
             switch(write)
             {
                 case false:
+                    if(mode == 2)
+                    {
+                        return io.bgXScroll[0] << 8 | io.bgCNT[3];
+                    }
                     return io.bgCNT[3];
                 break;
 
                 case true:
                     io.bgCNT[3] = value;
+                    if(mode == 2)
+                    {
+                        io.bgXScroll[0] = value >> 16;
+                    }
                     //io.lcdControlUpdated = true;
                 break;
             }
@@ -262,6 +305,27 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
             }
         break;
 
+        case 0x040000A0:
+            switch(write)
+            {
+                case false:
+                    return 0;
+                break;
+
+                case true:
+                    //printf("sussy baka.\n");
+                    //value = 0x12345678;
+                    for(int i = 0; i < 4; i++)
+                    {
+                        audio.samples[audio.streamCounter] = ((value >> (24 - (i * 8))) & 0xFF);
+                        audio.streamCounter++;
+                        audio.streamCounter %= 16;
+                    }
+                    //io.lcdControlUpdated = true;
+                break;
+            }
+        break;
+
         case 0x040000B0: // DMA0 Source Address
             switch(write)
             {
@@ -275,6 +339,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
                     {
                         io.dmaEndAddress[0] = value >> 16;
                     }
+                    if((io.dmaControl[0] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[0] = io.dmaStartAddress[0];
+                        io.lastEndAddr[0] = io.dmaEndAddress[0];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -292,6 +362,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
                     {
                         io.dmaWordCount[0] = value >> 16;
                     }
+                    if((io.dmaControl[0] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[0] = io.dmaStartAddress[0];
+                        io.lastEndAddr[0] = io.dmaEndAddress[0];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -309,6 +385,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
                     {
                         io.dmaControl[0] = value >> 16;
                     }
+                    if((io.dmaControl[0] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[0] = io.dmaStartAddress[0];
+                        io.lastEndAddr[0] = io.dmaEndAddress[0];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -330,6 +412,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
                     {
                         printf("32 Bit access to 0x%X is unimplemented!  This may cause bugs!\n",location);
                     }
+                    if((io.dmaControl[0] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[0] = io.dmaStartAddress[0];
+                        io.lastEndAddr[0] = io.dmaEndAddress[0];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -345,6 +433,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
 
                 case true:
                     io.dmaStartAddress[1] = value;
+                    if((io.dmaControl[1] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[1] = io.dmaStartAddress[1];
+                        io.lastEndAddr[1] = io.dmaEndAddress[1];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -358,6 +452,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
 
                 case true:
                     io.dmaEndAddress[1] = value;
+                    if((io.dmaControl[1] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[1] = io.dmaStartAddress[1];
+                        io.lastEndAddr[1] = io.dmaEndAddress[1];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -375,6 +475,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
                     {
                         printf("32 Bit access to 0x%X is unimplemented!  This may cause bugs!\n",location);
                     }
+                    if((io.dmaControl[1] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[1] = io.dmaStartAddress[1];
+                        io.lastEndAddr[1] = io.dmaEndAddress[1];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -396,6 +502,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
                     {
                         printf("32 Bit access to 0x%X is unimplemented!  This may cause bugs!\n",location);
                     }
+                    if((io.dmaControl[1] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[1] = io.dmaStartAddress[1];
+                        io.lastEndAddr[1] = io.dmaEndAddress[1];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -411,6 +523,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
 
                 case true:
                     io.dmaStartAddress[2] = value;
+                    if((io.dmaControl[2] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[2] = io.dmaStartAddress[2];
+                        io.lastEndAddr[2] = io.dmaEndAddress[2];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -424,6 +542,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
 
                 case true:
                     io.dmaEndAddress[2] = value;
+                    if((io.dmaControl[2] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[2] = io.dmaStartAddress[2];
+                        io.lastEndAddr[2] = io.dmaEndAddress[2];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -441,6 +565,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
                     {
                         printf("32 Bit access to 0x%X is unimplemented!  This may cause bugs!\n",location);
                     }
+                    if((io.dmaControl[2] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[2] = io.dmaStartAddress[2];
+                        io.lastEndAddr[2] = io.dmaEndAddress[2];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -462,6 +592,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
                     {
                         printf("32 Bit access to 0x%X is unimplemented!  This may cause bugs!\n",location);
                     }
+                    if((io.dmaControl[2] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[2] = io.dmaStartAddress[2];
+                        io.lastEndAddr[2] = io.dmaEndAddress[2];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -480,6 +616,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
                     {
                         io.dmaEndAddress[3] = value >> 16;
                     }
+                    if((io.dmaControl[3] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[3] = io.dmaStartAddress[3];
+                        io.lastEndAddr[3] = io.dmaEndAddress[3];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -497,6 +639,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
                     {
                         io.dmaWordCount[3] = value >> 16;
                     }
+                    if((io.dmaControl[3] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[3] = io.dmaStartAddress[3];
+                        io.lastEndAddr[3] = io.dmaEndAddress[3];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -514,6 +662,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
                     {
                         io.dmaControl[3] = value >> 16;
                     }
+                    if((io.dmaControl[3] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[3] = io.dmaStartAddress[3];
+                        io.lastEndAddr[3] = io.dmaEndAddress[3];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -535,6 +689,12 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
                     {
                         printf("32 Bit access to 0x%X is unimplemented!  This may cause bugs!\n",location);
                     }
+                    if((io.dmaControl[3] & 0x200) == 0)
+                    {
+                        io.lastStartAddr[3] = io.dmaStartAddress[3];
+                        io.lastEndAddr[3] = io.dmaEndAddress[3];
+                    }
+                    cpu.handleDMA();
                 break;
             }
         break;
@@ -669,7 +829,15 @@ uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool writ
 
 uint8_t badRamAccess;
 
-uint8_t *memPointArray[] =
+uint32_t *returnVal;
+uint16_t *returnVal16;
+uint32_t location2;
+
+uint8_t* mainMem;
+
+
+
+uint8_t *memPointArray[0x10] =
 {
     ram.bios,
     &badRamAccess,
@@ -680,24 +848,24 @@ uint8_t *memPointArray[] =
     ram.video,
     ram.object,
     ram.rom,
-    ram.rom,
-    ram.rom,
-    ram.rom,
-    ram.rom,
-    ram.rom,
+    ram.rom + 0x1000000,
+    ram.rom + 0x2000000,
+    ram.rom + 0x3000000,
+    ram.rom + 0x4000000,
+    ram.rom + 0x5000000,
     ram.save,
     &badRamAccess
 };
 
-uint32_t memRangeArray[] =
+uint32_t memRangeArray[0x10] =
 {
     0x4000,
-    0x0,
+    0x1,
     0x40000,
     0x8000,
     0xFFFFFFFF,
     0x400,
-    0x18000,
+    0x20000,
     0x400,
     0x1000000,
     0x1000000,
@@ -706,130 +874,152 @@ uint32_t memRangeArray[] =
     0x1000000,
     0x1000000,
     0x10000,
-    0x0
+    0x1
 };
 
-uint32_t gbaIO::readMem(uint32_t location, uint8_t mode)
+uint32_t andTable[3] = {
+    0xFF,
+    0xFFFF,
+    0xFFFFFFFF
+};
+
+uint8_t section;
+
+
+
+
+uint32_t gbaIO::oldReadMem(uint32_t location, uint8_t mode)
 {
-    if(mode == 0x0)
-    {
-        //return 0;
-    }
-    uint32_t *returnVal;
-    uint16_t *returnVal16;
-    uint8_t lookupVal = (location >> 24) & 0xF;
 
-    uint32_t location2 = location;
 
-    //location &= memRangeArray[lookupVal] - 1;
-    //location |= (lookupVal << 24);
 
-    /*
-    uint8_t* pointData;
-    pointData = memPointArray[lookupVal];
-    if(location > 0x0FFFFFFF)
-    {
-        switch(mode)
-        {
-            case 0: // 8 Bit
-                return readMem(cpu.R[15],0);
-            break;
-
-            case 1: // 16 Bit
-                return readMem(cpu.R[15],1);
-            break;
-
-            case 2: // 32 Bit
-                return readMem(cpu.R[15],2);
-            break;
-        }
-    }
-
-    switch(lookupVal)
-    {
-        case 4:
-            return handleIORegs(location, mode, 0, false);
-        break;
-    }
-
-    location &= 0x00FFFFFF;
-    if(location >= memRangeArray[lookupVal])
-    {
-        switch(mode)
-        {
-            case 0: // 8 Bit
-                return readMem(cpu.R[15],0);
-            break;
-
-            case 1: // 16 Bit
-                return readMem(cpu.R[15],1);
-            break;
-
-            case 2: // 32 Bit
-                return readMem(cpu.R[15],2);
-            break;
-        }
-    }
     //return 0;
-    //printf("location: 0x%X, 0x%X\n", location, lookupVal);
-    switch(mode)
-    {
-        case 0: // 8 Bit
-            return pointData[location];
-           // return ram.bios[location];
-        break;
+    //location2 = location;
 
-        case 1: // 16 Bit
-            location = location & 0xFFFFFFFE;
-            returnVal16 = (uint16_t *)(pointData + location);   // Make a pointer that points to the current 8 bit location,
-                                                            // Cast it as a 16 bit pointer, and put the value into another
-                                                            // 16 bit pointer.  This allows for much faster RAM lookups
-                                                            // at the cost of big-endian compatibility
-            switch(location2 & 0x1)
-            {
-                case 0:
-                    return returnVal16[0]; // Return the 16 bit value that is stored
-                break;
+    section = location >> 24;
+    section &= 0xF;
+    ram.accessTest[section]++;
 
-                case 1:
-                    return rotr16(returnVal16[0],8);
-                break;
-            }
-        break;
-
-        case 2: // 32 Bit
-            location = location & 0xFFFFFFFC;
-            returnVal = (uint32_t *)(pointData + location);   // Make a pointer that points to the current 8 bit location,
-                                                            // Cast it as a 32 bit pointer, and put the value into another
-                                                            // 32 bit pointer.  This allows for much faster RAM lookups
-                                                            // at the cost of big-endian compatibility
-            switch(location2 & 0x3)
-            {
-                case 0:
-                    return returnVal[0]; // Return the 32 bit value that is stored
-                break;
-
-                case 1:
-                    return rotr32(returnVal[0],8);
-                break;
-
-                case 2:
-                    return rotr32(returnVal[0],16);
-                break;
-
-                case 3:
-                    return rotr32(returnVal[0],24);
-                break;
-            }
-        break;
-    }
-
-
-    return 0;
-    //uint8_t *returnVal8;
-    */
     switch(location)
     {
+        case romLocation:
+            switch(mode)
+            {
+
+                case 1: // 16 Bit
+                    location -= 0x08000000; // Align Location
+                    //location &= 0x00FFFFFF;
+                    location = location & 0xFFFFFFFE;
+                    returnVal16 = (uint16_t *)(ram.rom + location);   // Make a pointer that points to the current 8 bit location,
+                                                                    // Cast it as a 16 bit pointer, and put the value into another
+                                                                    // 16 bit pointer.  This allows for much faster RAM lookups
+                                                                    // at the cost of big-endian compatibility
+                    switch(location2 & 0x1)
+                    {
+                        case 0:
+                            return returnVal16[0]; // Return the 16 bit value that is stored
+                        break;
+
+                        case 1:
+                            return rotr16(returnVal16[0],8);
+                        break;
+                    }
+                break;
+
+                case 0: // 8 Bit
+                    location -= 0x08000000; // Align Location
+                    return ram.rom[location];
+                break;
+
+                case 2: // 32 Bit
+                    location -= 0x08000000; // Align Location
+                    location = location & 0xFFFFFFFC;
+                    returnVal = (uint32_t *)(ram.rom + location);   // Make a pointer that points to the current 8 bit location,
+                                                                    // Cast it as a 32 bit pointer, and put the value into another
+                                                                    // 32 bit pointer.  This allows for much faster RAM lookups
+                                                                    // at the cost of big-endian compatibility
+                    //return returnVal[0];
+                    switch(location2 & 0x3)
+                    {
+                        case 0:
+                            return returnVal[0]; // Return the 32 bit value that is stored
+                        break;
+
+                        case 1:
+                            return rotr32(returnVal[0],8);
+                        break;
+
+                        case 2:
+                            return rotr32(returnVal[0],16);
+                        break;
+
+                        case 3:
+                            return rotr32(returnVal[0],24);
+                        break;
+                    }
+                break;
+            }
+        break;
+
+        case onChipLocation:
+            switch(mode)
+            {
+                case 0: // 8 Bit
+                    //location -= 0x03000000; // Align Location
+                    location &= 0x7FFF;
+                    return ram.onChip[location];
+                break;
+
+                case 1: // 16 Bit
+                    //location -= 0x03000000; // Align Location
+                    location &= 0x7FFE;
+                    //location = location & 0xFFFFFFFE;
+                    returnVal16 = (uint16_t *)(ram.onChip + location);   // Make a pointer that points to the current 8 bit location,
+                                                                    // Cast it as a 16 bit pointer, and put the value into another
+                                                                    // 16 bit pointer.  This allows for much faster RAM lookups
+                                                                    // at the cost of big-endian compatibility
+                    switch(location2 & 0x1)
+                    {
+                        case 0:
+                            return returnVal16[0]; // Return the 16 bit value that is stored
+                        break;
+
+                        case 1:
+                            return rotr16(returnVal16[0],8);
+                        break;
+                    }
+                break;
+
+                case 2: // 32 Bit
+                    //location -= 0x03000000; // Align Location
+                    location &= 0x7FFC;
+                    //location = location & 0xFFFFFFFC;
+                    returnVal = (uint32_t *)(ram.onChip + location);   // Make a pointer that points to the current 8 bit location,
+                                                                    // Cast it as a 32 bit pointer, and put the value into another
+                                                                    // 32 bit pointer.  This allows for much faster RAM lookups
+                                                                    // at the cost of big-endian compatibility
+                    //return returnVal[0];
+                    switch(location2 & 0x3)
+                    {
+                        case 0:
+                            return returnVal[0]; // Return the 32 bit value that is stored
+                        break;
+
+                        case 1:
+                            return rotr32(returnVal[0],8);
+                        break;
+
+                        case 2:
+                            return rotr32(returnVal[0],16);
+                        break;
+
+                        case 3:
+                            return rotr32(returnVal[0],24);
+                        break;
+                    }
+                break;
+            }
+        break;
 
         case biosLocation:
             switch(mode)
@@ -884,6 +1074,10 @@ uint32_t gbaIO::readMem(uint32_t location, uint8_t mode)
             }
         break;
 
+        case ioLocaton:
+            return handleIORegs(location,mode,0,false);
+        break;
+
         case onBoardLocation:
             switch(mode)
             {
@@ -915,62 +1109,6 @@ uint32_t gbaIO::readMem(uint32_t location, uint8_t mode)
                     location -= 0x02000000; // Align Location
                     location = location & 0xFFFFFFFC;
                     returnVal = (uint32_t *)(ram.onBoard + location);   // Make a pointer that points to the current 8 bit location,
-                                                                    // Cast it as a 32 bit pointer, and put the value into another
-                                                                    // 32 bit pointer.  This allows for much faster RAM lookups
-                                                                    // at the cost of big-endian compatibility
-                    switch(location2 & 0x3)
-                    {
-                        case 0:
-                            return returnVal[0]; // Return the 32 bit value that is stored
-                        break;
-
-                        case 1:
-                            return rotr32(returnVal[0],8);
-                        break;
-
-                        case 2:
-                            return rotr32(returnVal[0],16);
-                        break;
-
-                        case 3:
-                            return rotr32(returnVal[0],24);
-                        break;
-                    }
-                break;
-            }
-        break;
-
-        case onChipLocation:
-            switch(mode)
-            {
-                case 0: // 8 Bit
-                    location -= 0x03000000; // Align Location
-                    return ram.onChip[location];
-                break;
-
-                case 1: // 16 Bit
-                    location -= 0x03000000; // Align Location
-                    location = location & 0xFFFFFFFE;
-                    returnVal16 = (uint16_t *)(ram.onChip + location);   // Make a pointer that points to the current 8 bit location,
-                                                                    // Cast it as a 16 bit pointer, and put the value into another
-                                                                    // 16 bit pointer.  This allows for much faster RAM lookups
-                                                                    // at the cost of big-endian compatibility
-                    switch(location2 & 0x1)
-                    {
-                        case 0:
-                            return returnVal16[0]; // Return the 16 bit value that is stored
-                        break;
-
-                        case 1:
-                            return rotr16(returnVal16[0],8);
-                        break;
-                    }
-                break;
-
-                case 2: // 32 Bit
-                    location -= 0x03000000; // Align Location
-                    location = location & 0xFFFFFFFC;
-                    returnVal = (uint32_t *)(ram.onChip + location);   // Make a pointer that points to the current 8 bit location,
                                                                     // Cast it as a 32 bit pointer, and put the value into another
                                                                     // 32 bit pointer.  This allows for much faster RAM lookups
                                                                     // at the cost of big-endian compatibility
@@ -1053,10 +1191,6 @@ uint32_t gbaIO::readMem(uint32_t location, uint8_t mode)
                     }
                 break;
             }
-        break;
-
-        case ioLocaton:
-            return handleIORegs(location,mode,0,false);
         break;
 
         case palLocation:
@@ -1227,62 +1361,6 @@ uint32_t gbaIO::readMem(uint32_t location, uint8_t mode)
             }
         break;
 
-        case romLocation:
-            switch(mode)
-            {
-                case 0: // 8 Bit
-                    location -= 0x08000000; // Align Location
-                    return ram.rom[location];
-                break;
-
-                case 1: // 16 Bit
-                    location -= 0x08000000; // Align Location
-                    location = location & 0xFFFFFFFE;
-                    returnVal16 = (uint16_t *)(ram.rom + location);   // Make a pointer that points to the current 8 bit location,
-                                                                    // Cast it as a 16 bit pointer, and put the value into another
-                                                                    // 16 bit pointer.  This allows for much faster RAM lookups
-                                                                    // at the cost of big-endian compatibility
-                    switch(location2 & 0x1)
-                    {
-                        case 0:
-                            return returnVal16[0]; // Return the 16 bit value that is stored
-                        break;
-
-                        case 1:
-                            return rotr16(returnVal16[0],8);
-                        break;
-                    }
-                break;
-
-                case 2: // 32 Bit
-                    location -= 0x08000000; // Align Location
-                    location = location & 0xFFFFFFFC;
-                    returnVal = (uint32_t *)(ram.rom + location);   // Make a pointer that points to the current 8 bit location,
-                                                                    // Cast it as a 32 bit pointer, and put the value into another
-                                                                    // 32 bit pointer.  This allows for much faster RAM lookups
-                                                                    // at the cost of big-endian compatibility
-                    switch(location2 & 0x3)
-                    {
-                        case 0:
-                            return returnVal[0]; // Return the 32 bit value that is stored
-                        break;
-
-                        case 1:
-                            return rotr32(returnVal[0],8);
-                        break;
-
-                        case 2:
-                            return rotr32(returnVal[0],16);
-                        break;
-
-                        case 3:
-                            return rotr32(returnVal[0],24);
-                        break;
-                    }
-                break;
-            }
-        break;
-
         case saveLocation:
             switch(mode)
             {
@@ -1302,14 +1380,13 @@ uint32_t gbaIO::readMem(uint32_t location, uint8_t mode)
         break;
 
         default:
-            /*
+            return 0;
             printf("UNIMPLEMENTED LOCATION: 0x%X\n",location);
             printf("PC: 0x%X\n",cpu.R[15]);
             while(true)
             {
 
             }
-            */
             switch(ram.openBusEnable)
             {
                 case false:
@@ -1342,8 +1419,6 @@ uint32_t gbaIO::readMem(uint32_t location, uint8_t mode)
     }
     return 0xFFFFFFFF;
 }
-
-
 
 
 void gbaIO::writeMem(uint32_t location, uint8_t mode, uint32_t value)

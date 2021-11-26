@@ -1,14 +1,15 @@
 # depslib dependency file v1.0
-1635815437 source:/home/zach/codeblocks/nopGBA (Rewrite)/cpu.cpp
+1637908954 source:/home/zach/codeblocks/nopGBA (Rewrite)/cpu.cpp
 	"cpu.hpp"
 	"io.hpp"
 	"ui.hpp"
+	"audio.hpp"
 	<iostream>
 
-1635815581 /home/zach/codeblocks/nopGBA (Rewrite)/cpu.hpp
+1637909446 /home/zach/codeblocks/nopGBA (Rewrite)/cpu.hpp
 	<stdint.h>
 
-1635815818 source:/home/zach/codeblocks/nopGBA (Rewrite)/main.cpp
+1636327204 source:/home/zach/codeblocks/nopGBA (Rewrite)/main.cpp
 	<iostream>
 	"file.hpp"
 	"cpu.hpp"
@@ -25,21 +26,22 @@
 	"io.hpp"
 	<stdint.h>
 
-1635642497 source:/home/zach/codeblocks/nopGBA (Rewrite)/arm.cpp
+1636312723 source:/home/zach/codeblocks/nopGBA (Rewrite)/arm.cpp
 	"cpu.hpp"
 	"io.hpp"
 	"ui.hpp"
 	<stdio.h>
 
-1629139422 /home/zach/codeblocks/nopGBA (Rewrite)/io.hpp
+1636331760 /home/zach/codeblocks/nopGBA (Rewrite)/io.hpp
 	<stdint.h>
 
-1635818202 source:/home/zach/codeblocks/nopGBA (Rewrite)/io.cpp
+1637904334 source:/home/zach/codeblocks/nopGBA (Rewrite)/io.cpp
 	"io.hpp"
 	"cpu.hpp"
+	"audio.hpp"
 	<stdio.h>
 
-1635655001 source:/home/zach/codeblocks/nopGBA (Rewrite)/thumb.cpp
+1636322655 source:/home/zach/codeblocks/nopGBA (Rewrite)/thumb.cpp
 	"cpu.hpp"
 	"io.hpp"
 	"ui.hpp"
@@ -47,12 +49,13 @@
 
 1626281806 source:/home/zach/codeblocks/nopGBA (Rewrite)/z80.cpp
 
-1635818169 source:/home/zach/codeblocks/nopGBA (Rewrite)/ui.cpp
+1637908808 source:/home/zach/codeblocks/nopGBA (Rewrite)/ui.cpp
 	"ui.hpp"
 	"io.hpp"
 	"file.hpp"
 	"display.hpp"
 	"cpu.hpp"
+	"audio.hpp"
 	"imgui_impl_opengl3.h"
 	"imgui_impl_sdl.h"
 	"string"
@@ -60,7 +63,7 @@
 	<string>
 	<sstream>
 
-1635814214 /home/zach/codeblocks/nopGBA (Rewrite)/ui.hpp
+1637886837 /home/zach/codeblocks/nopGBA (Rewrite)/ui.hpp
 	<SDL2/SDL.h>
 	<GL/glew.h>
 	"imgui.h"
@@ -255,11 +258,19 @@
 1626826747 /home/zach/codeblocks/nopGBA (Rewrite)/input.hpp
 	<SDL2/SDL.h>
 
-1635705542 source:/home/zach/codeblocks/nopGBA (Rewrite)/display.cpp
+1636316854 source:/home/zach/codeblocks/nopGBA (Rewrite)/display.cpp
 	"display.hpp"
 	"ui.hpp"
 	"io.hpp"
 
-1635698746 /home/zach/codeblocks/nopGBA (Rewrite)/display.hpp
+1636314144 /home/zach/codeblocks/nopGBA (Rewrite)/display.hpp
 	<iostream>
+
+1637910400 source:/home/zach/codeblocks/nopGBA (Rewrite)/audio.cpp
+	"audio.hpp"
+	"cpu.hpp"
+	"io.hpp"
+
+1637908677 /home/zach/codeblocks/nopGBA (Rewrite)/audio.hpp
+	<SDL2/SDL.h>
 

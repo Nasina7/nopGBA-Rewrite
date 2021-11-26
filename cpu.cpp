@@ -1,6 +1,7 @@
 #include "cpu.hpp"
 #include "io.hpp"
 #include "ui.hpp"
+#include "audio.hpp"
 #include <iostream>
 
 
@@ -272,7 +273,96 @@ void gbaCPU::doInterrupts()
     }
 }
 
+void gbaCPU::doAudioDMATransfer(uint32_t startAddrDMA, uint32_t endAddrDMA, uint32_t wordCountDMA, uint32_t dmaControl)
+{
+    bool dmaWriteMode = ((dmaControl & (0x1 << 10)) != 0);
+    //printf("dmaWRITEMODE: 0x%X\n",dmaWriteMode);
+    for(int i = 3; i != -1; i--)
+    {
+        //io.writeMem(endAddrDMA,2,io.readMem(startAddrDMA,2));
+        //audio.samples[i] =
+        //io.oldReadMem(startAddrDMA,2);
+        uint8_t addrControl = ((dmaControl & (0x1 << 6)) != 0) << 1 | ((dmaControl & (0x1 << 5)) != 0);
+        addrControl = ((dmaControl & (0x1 << 8)) != 0) << 1 | ((dmaControl & (0x1 << 7)) != 0);
+        switch(addrControl)
+        {
+            case 0:
+                //startAddrDMA += 4;
+            break;
 
+            case 1:
+                //startAddrDMA -= 4;
+            break;
+
+            case 2:
+                // Don't change end address
+            break;
+
+            default:
+                printf("DMA WARNING 3!\n");
+            break;
+        }
+    }
+   // printf("DMA FINISH!\n");
+}
+
+void doDMATransfer1(uint32_t startAddrDMA, uint32_t endAddrDMA, uint32_t wordCountDMA, uint32_t dmaControl)
+{
+
+    bool dmaWriteMode = ((dmaControl & (0x1 << 10)) != 0);
+    printf("DMALOC: 0x%X\n",startAddrDMA);
+
+    wordCountDMA = 4;
+    audio.streamCounter = 0;
+
+    for(int i = 0; i < 4; i++)
+    {
+        for(int x = 0; x < 4; x++)
+        {
+            audio.samples[((i) * 4) + x] = io.readMem(startAddrDMA + (i * 4) + x, 0);
+        }
+    }
+
+    startAddrDMA += 16;
+
+
+    /*
+    while(wordCountDMA != 0)
+    {
+        for(int i = 0; i < 4; i++)
+        {
+            audio.samples[((4 - wordCountDMA) * 4) + (i)] = io.readMem(startAddrDMA + i, 0);
+        }
+        //io.writeMem(0x040000A0,2,io.readMem(startAddrDMA,2));
+        wordCountDMA--;
+        uint8_t addrControl = ((dmaControl & (0x1 << 6)) != 0) << 1 | ((dmaControl & (0x1 << 5)) != 0);
+        addrControl = ((dmaControl & (0x1 << 8)) != 0) << 1 | ((dmaControl & (0x1 << 7)) != 0);
+        switch(addrControl)
+        {
+            case 0:
+                startAddrDMA += 4;
+            break;
+
+            case 1:
+                startAddrDMA -= 4;
+            break;
+
+            case 2:
+                // Don't change end address
+            break;
+
+            default:
+                printf("DMA WARNING 3!\n");
+            break;
+        }
+    }
+    */
+    //if(io.dmaControl[1] & 0x200 != 0)
+    //{
+        io.lastStartAddr[1] = startAddrDMA;
+    //}
+   // printf("DMA FINISH!\n");
+}
 
 void doDMATransfer(uint32_t startAddrDMA, uint32_t endAddrDMA, uint32_t wordCountDMA, uint32_t dmaControl)
 {
@@ -387,6 +477,10 @@ void doDMATransfer(uint32_t startAddrDMA, uint32_t endAddrDMA, uint32_t wordCoun
             printf("this should not happen.  DMA ERROR!\n");
         break;
     }
+    if(io.dmaControl[1] & 0x200 != 0)
+    {
+        io.lastStartAddr[1] = startAddrDMA;
+    }
    // printf("DMA FINISH!\n");
 }
 
@@ -414,43 +508,20 @@ void gbaCPU::handleDMA()
             //printf("DMA TIMING IS NOT IMPLEMENTED!\n");
         }
     }
-    if((io.dmaControl[1] & 0x8000) != 0)
+    if((io.dmaControl[1] & 0x8000) != 0 && audio.inAudioCallback == true)
     {
-        /*
-        startAddrDMA = gbaREG.dmaStartAddress[1];
-        endAddrDMA = gbaREG.dmaEndAddress[1];
-        wordCountDMA = gbaREG.dmaWordCount[1];
-        //printf("WORD: 0x%X\n",wordCountDMA);
-        dmaControl = gbaREG.dmaControl1.to_ulong();
-        if(gbaREG.dmaControl1[13] == 0 && gbaREG.dmaControl2[12] == 0 && wordCountDMA != 0)
+        uint16_t dmaControl = io.dmaControl[1];
+        if(((dmaControl & (0x1 << 13)) != 0) != 0 && ((dmaControl & (0x1 << 12)) != 0) != 0)
         {
             // Immediately
-            printf("DMA 1 WAS ENABLED!\n");
-            //breakpoint = true;
-            doDMATransfer();
-            gbaREG.dmaControl1[15] = 0;
+            //printf("DMA 1 WAS ENABLED!\n");
+
+            doDMATransfer1(io.lastStartAddr[1], 0x040000A0, 4, io.dmaControl[1] | (0x1 << 10));
+            if(io.dmaControl[1] & 0x200 == 0)
+            {
+                io.dmaControl[1] = io.dmaControl[1] & 0x7FFF;
+            }
         }
-        if(gbaREG.dmaControl1[13] == 1 && gbaREG.dmaControl2[12] == 1)
-        {
-            // Immediately
-            printf("DMA 1 WAS ENABLED!\n");
-            printf("DMA1Start: 0x%X\n", startAddrDMA);
-            printf("EndAddrDMA: 0x%X\n", endAddrDMA);
-            printf("wordCountDMA: 0x%X\n", wordCountDMA);
-            doSNDDMATransfer();
-            gbaREG.dmaStartAddress[1] = startAddrDMA;
-            //breakpoint = true;
-            gbaREG.dmaControl1[15] = 0;
-        }
-        //if(gbaREG.dmaControl1[13] != gbaREG.dmaControl1[12] && gbaREG.dmaControl1[15] == 1)
-        //{
-        //    printf("DMA1Start: 0x%X\n", startAddrDMA);
-        //    printf("EndAddrDMA: 0x%X\n", endAddrDMA);
-        //    printf("wordCountDMA: 0x%X\n", wordCountDMA);
-        //    doDMATransfer();
-        //    gbaREG.dmaControl1[15] = 0;
-        //}
-        */
     }
     if((io.dmaControl[2] & 0x8000) != 0)
     {
@@ -495,14 +566,26 @@ void gbaCPU::handleDMA()
 
 void gbaCPU::doOpcode()
 {
+    if(cpu.cpsr.T == modeThumb)
+    {
+        cpu.runTHUMB(io.readMem(cpu.R[15], 1));
+        return;
+    }
+    else
+    {
+        decodeAndRunARM();
+        return;
+    }
+    /*
     switch(cpu.cpsr.T)
     {
         case modeArm:
-            decodeAndRunARM();
+
         break;
 
         case modeThumb:
-            decodeAndRunTHUMB();
+
         break;
     }
+    */
 }

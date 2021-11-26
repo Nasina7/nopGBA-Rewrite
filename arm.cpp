@@ -22,11 +22,11 @@
 void gbaCPU::decodeAndRunARM()
 {
     //uint32_t opcode = io.get32bitOpcode(cpu.R[15] - 8);
-    uint32_t opcode = io.readMem(cpu.R[15], 2);
-    cpu.lastOpcodeRan = opcode;
+   // uint32_t opcode = io.readMem(cpu.R[15], 2);
+    cpu.lastOpcodeRan = io.readMem(cpu.R[15], 2);
     //printf("Opcode: 0x%X\n",opcode);
 
-    uint8_t condition = (opcode >> 28);
+    uint8_t condition = (cpu.lastOpcodeRan >> 28);
 
     switch(condition)
     {
@@ -37,7 +37,7 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.Z == 1)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
@@ -48,7 +48,7 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.Z == 0)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
@@ -59,7 +59,7 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.C == 1)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
@@ -70,7 +70,7 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.C == 0)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
@@ -81,7 +81,7 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.N == 1)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
@@ -92,7 +92,7 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.N == 0)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
@@ -103,7 +103,7 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.V == 1)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
@@ -114,7 +114,7 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.V == 0)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
@@ -125,7 +125,7 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.C == 1 && cpu.cpsr.Z == 0)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
@@ -136,7 +136,7 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.C == 0 || cpu.cpsr.Z == 1)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
@@ -153,7 +153,7 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.Z == 0 && cpu.cpsr.N == cpu.cpsr.V)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
@@ -165,7 +165,7 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.Z != 0 || cpu.cpsr.N != cpu.cpsr.V)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
@@ -176,7 +176,7 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.V == cpu.cpsr.N)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
@@ -187,12 +187,12 @@ void gbaCPU::decodeAndRunARM()
             }
             if(cpu.cpsr.V != cpu.cpsr.N)
             {
-                cpu.runARM(opcode);
+                cpu.runARM(cpu.lastOpcodeRan);
             }
         break;
 
         case condAlways:
-            cpu.runARM(opcode);
+            cpu.runARM(cpu.lastOpcodeRan);
         break;
 
         default:
