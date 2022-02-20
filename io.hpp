@@ -1,4 +1,10 @@
 #include <stdint.h>
+#define rotl32(x,a) ((x << a) | (x >> (32 - a)))
+#define rotl16(x,a) ((x << a) | (x >> (16 - a)))
+#define rotl8(x,a) ((x << a) | (x >> (8 - a)))
+#define rotr32(x,a) ((x >> a) | (x << (32 - a)))
+#define rotr16(x,a) ((x >> a) | (x << (16 - a)))
+#define rotr8(x,a) ((x >> a) | (x << (8 - a)))
 
 class gbaRAM
 {
@@ -43,7 +49,6 @@ extern uint8_t *memPointArray[0x10];
 extern uint32_t memRangeArray[0x10];
 
 extern uint32_t andTable[3];
-
 extern uint8_t section;
 
 class gbaIO {
@@ -73,12 +78,14 @@ class gbaIO {
         bool HALTCNT;
         bool currentlyHalted;
 
+        uint16_t WAITCNT;
+
         uint16_t bgCNT[4];
         uint16_t bgXScroll[4];
         uint16_t bgYScroll[4];
         uint16_t soundBias;
 
-        uint16_t SOUNDCNT_H[4];
+        uint16_t SOUNDCNT_H;
         uint16_t SOUNDCNT_HD;
 
         uint16_t KEYINPUT;
@@ -86,7 +93,7 @@ class gbaIO {
         uint16_t TMCNT_L[4]; // Reload
         uint16_t TMCNT_H[4]; // Control
         uint16_t TMCNT_C[4]; // Counter
-
+        uint8_t VCOUNT;
 
 
 
@@ -94,27 +101,42 @@ class gbaIO {
         uint32_t get32bitOpcode(uint32_t location);
         uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool write);
         uint32_t oldReadMem(uint32_t location, uint8_t mode);
+        uint32_t locationCorrector[0x3] = {
+            0xFFFFFFFF,
+            0xFFFFFFFE,
+            0xFFFFFFFC
+        };
         uint32_t readMem(uint32_t location, uint8_t mode)
         {
-            section = location >> 24;
-            section &= 0xF;
+            //return oldReadMem(location, mode);
+            uint8_t section2 = location >> 24;
+            section2 &= 0xF;
             //ram.accessTest[section]++;
 
-            if(section == 4)
+            if(section2 == 4)
             {
                 return handleIORegs(location, mode, 0, false);
             }
-            if(section == 1 || section == 0xF)
+            if(section2 == 1 || section2 == 0xF)
             {
                 return 0;
             }
-            if(section == 6 && (location & (memRangeArray[section] - 1)) > 0x17FFF)
+            if(section2 == 6 && (location & (memRangeArray[section2] - 1)) > 0x17FFF)
             {
                 return 0;
             }
+            uint32_t newLocation = location & locationCorrector[mode];
+            uint32_t result = ((uint32_t*)(memPointArray[section2] + ((newLocation) & (memRangeArray[section2] - 1))))[0] & andTable[mode];
+            if(mode == 1)
+            {
+                //result = rotl16(result, (location & 0x1) * 8);
+            }
+            if(mode == 2)
+            {
+                result = rotr32(result, (location & 0x3) * 8);
+            }
 
-
-            return ((uint32_t*)(memPointArray[section] + (location & (memRangeArray[section] - 1))))[0] & andTable[mode];
+            return result;
         }
         void writeMem(uint32_t location, uint8_t mode, uint32_t value);
     private:

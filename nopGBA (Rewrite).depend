@@ -1,21 +1,24 @@
 # depslib dependency file v1.0
-1637908954 source:/home/zach/codeblocks/nopGBA (Rewrite)/cpu.cpp
+1645325041 source:/home/zach/codeblocks/nopGBA (Rewrite)/cpu.cpp
 	"cpu.hpp"
 	"io.hpp"
 	"ui.hpp"
 	"audio.hpp"
 	<iostream>
 
-1637909446 /home/zach/codeblocks/nopGBA (Rewrite)/cpu.hpp
+1645330168 /home/zach/codeblocks/nopGBA (Rewrite)/cpu.hpp
 	<stdint.h>
 
-1636327204 source:/home/zach/codeblocks/nopGBA (Rewrite)/main.cpp
+1645341751 source:/home/zach/codeblocks/nopGBA (Rewrite)/main.cpp
 	<iostream>
 	"file.hpp"
 	"cpu.hpp"
 	"ui.hpp"
 	"io.hpp"
 	"input.hpp"
+	"audio.hpp"
+	"display.hpp"
+	<thread>
 
 1624471118 /home/zach/codeblocks/nopGBA (Rewrite)/file.hpp
 	<iostream>
@@ -26,22 +29,23 @@
 	"io.hpp"
 	<stdint.h>
 
-1636312723 source:/home/zach/codeblocks/nopGBA (Rewrite)/arm.cpp
+1645335371 source:/home/zach/codeblocks/nopGBA (Rewrite)/arm.cpp
 	"cpu.hpp"
 	"io.hpp"
 	"ui.hpp"
 	<stdio.h>
 
-1636331760 /home/zach/codeblocks/nopGBA (Rewrite)/io.hpp
+1645341800 /home/zach/codeblocks/nopGBA (Rewrite)/io.hpp
 	<stdint.h>
 
-1637904334 source:/home/zach/codeblocks/nopGBA (Rewrite)/io.cpp
+1645341710 source:/home/zach/codeblocks/nopGBA (Rewrite)/io.cpp
 	"io.hpp"
 	"cpu.hpp"
 	"audio.hpp"
+	"ui.hpp"
 	<stdio.h>
 
-1636322655 source:/home/zach/codeblocks/nopGBA (Rewrite)/thumb.cpp
+1645319118 source:/home/zach/codeblocks/nopGBA (Rewrite)/thumb.cpp
 	"cpu.hpp"
 	"io.hpp"
 	"ui.hpp"
@@ -49,12 +53,13 @@
 
 1626281806 source:/home/zach/codeblocks/nopGBA (Rewrite)/z80.cpp
 
-1637908808 source:/home/zach/codeblocks/nopGBA (Rewrite)/ui.cpp
+1645338079 source:/home/zach/codeblocks/nopGBA (Rewrite)/ui.cpp
 	"ui.hpp"
 	"io.hpp"
 	"file.hpp"
 	"display.hpp"
 	"cpu.hpp"
+	"input.hpp"
 	"audio.hpp"
 	"imgui_impl_opengl3.h"
 	"imgui_impl_sdl.h"
@@ -62,13 +67,15 @@
 	<time.h>
 	<string>
 	<sstream>
+	<atomic>
 
-1637886837 /home/zach/codeblocks/nopGBA (Rewrite)/ui.hpp
+1645337639 /home/zach/codeblocks/nopGBA (Rewrite)/ui.hpp
 	<SDL2/SDL.h>
 	<GL/glew.h>
 	"imgui.h"
 	"ImGuiFileDialog.h"
 	"imgui_memory_editor.h"
+	<atomic>
 
 1596483102 /home/zach/codeblocks/nopGBA (Rewrite)/imgui.h
 	"imconfig.h"
@@ -248,29 +255,30 @@
 	<algorithm>
 	<iostream>
 
-1626826724 source:/home/zach/codeblocks/nopGBA (Rewrite)/input.cpp
+1645206829 source:/home/zach/codeblocks/nopGBA (Rewrite)/input.cpp
 	"input.hpp"
 	"io.hpp"
 	"imgui.h"
 	"imgui_impl_opengl3.h"
 	"imgui_impl_sdl.h"
+	"ui.hpp"
 
 1626826747 /home/zach/codeblocks/nopGBA (Rewrite)/input.hpp
 	<SDL2/SDL.h>
 
-1636316854 source:/home/zach/codeblocks/nopGBA (Rewrite)/display.cpp
+1645314543 source:/home/zach/codeblocks/nopGBA (Rewrite)/display.cpp
 	"display.hpp"
 	"ui.hpp"
 	"io.hpp"
 
-1636314144 /home/zach/codeblocks/nopGBA (Rewrite)/display.hpp
+1645307440 /home/zach/codeblocks/nopGBA (Rewrite)/display.hpp
 	<iostream>
 
-1637910400 source:/home/zach/codeblocks/nopGBA (Rewrite)/audio.cpp
+1643434155 source:/home/zach/codeblocks/nopGBA (Rewrite)/audio.cpp
 	"audio.hpp"
 	"cpu.hpp"
 	"io.hpp"
 
-1637908677 /home/zach/codeblocks/nopGBA (Rewrite)/audio.hpp
+1643427399 /home/zach/codeblocks/nopGBA (Rewrite)/audio.hpp
 	<SDL2/SDL.h>
 

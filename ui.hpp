@@ -3,7 +3,9 @@
 #include "imgui.h"
 #include "ImGuiFileDialog.h"
 #include "imgui_memory_editor.h"
+#include <atomic>
 
+using namespace std;
 
 class gbaUI {
     public:
@@ -16,10 +18,15 @@ class gbaUI {
         bool useRunTo;
         bool runNoStep;
         uint32_t runToLocation;
-        bool startEmulation;
+        bool experimentalSpeedup;
+        bool disableTimers;
+        bool useVSYNC;
 
         bool endEmulator;
+        bool startEmulation;
 
+        uint64_t framesPerSecondEMU;
+        uint8_t biosLoaded;
 
     private:
         void testWindow();
@@ -33,6 +40,7 @@ class gbaUI {
         void dmaWindow();
         void dispRegWindow();
         void intRegisterWindow();
+        void speedHacks();
 
         void displayViewer();
         GLuint screenView;
@@ -48,6 +56,7 @@ class gbaUI {
         uint32_t bgTileTexture[8 * 0x40][8 * 0x10];
 
         void debugWindow();
+        void mainWindow();
         void setRunEmulation(bool value);
 
         void ramOptionsWindow();

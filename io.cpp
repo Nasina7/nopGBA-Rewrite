@@ -1,6 +1,7 @@
 #include "io.hpp"
 #include "cpu.hpp"
 #include "audio.hpp"
+#include "ui.hpp"
 #include <stdio.h>
 
 gbaIO io;
@@ -95,14 +96,21 @@ uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bo
             }
             if(mode == 2)
             {
-                printf("32 Bit access to 0x%X is unimplemented!  This may cause bugs!\n",location);
+                case false: // Read
+                    io.dispStat = io.dispStat ^ 0x1;
+                    return io.LY << 8 | io.dispStat;
+                break;
+
+                case true: // Write
+                    io.dispStat = value;
+                break;
             }
         break;
 
         case 0x04000006:
-            io.LY++;
-            io.LY = io.LY % 228;
-            return io.LY;
+            //io.LY++;
+            //io.LY = io.LY % 228;
+            return io.VCOUNT;
         break;
 
         case 0x04000008: // BG CONTROL 0
@@ -201,7 +209,7 @@ uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bo
                 break;
 
                 case true:
-                    io.bgXScroll[0] = value;
+                    io.bgXScroll[0] = value & 0x1FF;
                     //io.lcdControlUpdated = true;
                 break;
             }
@@ -215,7 +223,7 @@ uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bo
                 break;
 
                 case true:
-                    io.bgYScroll[0] = value;
+                    io.bgYScroll[0] = value & 0x1FF;
                     //io.lcdControlUpdated = true;
                 break;
             }
@@ -229,7 +237,7 @@ uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bo
                 break;
 
                 case true:
-                    io.bgXScroll[1] = value;
+                    io.bgXScroll[1] = value & 0x1FF;
                     //io.lcdControlUpdated = true;
                 break;
             }
@@ -243,7 +251,7 @@ uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bo
                 break;
 
                 case true:
-                    io.bgYScroll[1] = value;
+                    io.bgYScroll[1] = value & 0x1FF;
                     //io.lcdControlUpdated = true;
                 break;
             }
@@ -257,7 +265,7 @@ uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bo
                 break;
 
                 case true:
-                    io.bgXScroll[2] = value;
+                    io.bgXScroll[2] = value & 0x1FF;
                     //io.lcdControlUpdated = true;
                 break;
             }
@@ -271,7 +279,7 @@ uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bo
                 break;
 
                 case true:
-                    io.bgYScroll[2] = value;
+                    io.bgYScroll[2] = value & 0x1FF;
                     //io.lcdControlUpdated = true;
                 break;
             }
@@ -285,7 +293,7 @@ uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bo
                 break;
 
                 case true:
-                    io.bgXScroll[3] = value;
+                    io.bgXScroll[3] = value & 0x1FF;
                     //io.lcdControlUpdated = true;
                 break;
             }
@@ -299,7 +307,21 @@ uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bo
                 break;
 
                 case true:
-                    io.bgYScroll[3] = value;
+                    io.bgYScroll[3] = value & 0x1FF;
+                    //io.lcdControlUpdated = true;
+                break;
+            }
+        break;
+
+        case 0x04000082: // Sound CNT
+            switch(write)
+            {
+                case false:
+                    return io.SOUNDCNT_H;
+                break;
+
+                case true:
+                    io.SOUNDCNT_H = value;
                     //io.lcdControlUpdated = true;
                 break;
             }
@@ -497,15 +519,15 @@ uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bo
                 break;
 
                 case true:
+                    if((value & 0x8000) == 0x8000)
+                    {
+                        io.lastStartAddr[1] = io.dmaStartAddress[1];
+                        io.lastEndAddr[1] = io.dmaEndAddress[1];
+                    }
                     io.dmaControl[1] = value;
                     if(mode == 2)
                     {
                         printf("32 Bit access to 0x%X is unimplemented!  This may cause bugs!\n",location);
-                    }
-                    if((io.dmaControl[1] & 0x200) == 0)
-                    {
-                        io.lastStartAddr[1] = io.dmaStartAddress[1];
-                        io.lastEndAddr[1] = io.dmaEndAddress[1];
                     }
                     cpu.handleDMA();
                 break;
@@ -699,6 +721,206 @@ uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bo
             }
         break;
 
+        case 0x04000100:
+            switch(write)
+            {
+                case false:
+                    if(mode == 2)
+                    {
+                        return io.TMCNT_H[0] << 16 | io.TMCNT_C[0];
+                    }
+                    return 0x10000 - (cpu.timerScheduler[0] / cpu.timerFreqLookup[io.TMCNT_H[0] & 0x3]);
+                break;
+
+                case true:
+                    io.TMCNT_L[0] = value;
+                    if(mode == 2)
+                    {
+                        if((io.TMCNT_H[0] & 0x80) == 0 && (value & 0x80) == 0x80)
+                        {
+                            io.TMCNT_C[0] = value;
+                        }
+                        io.TMCNT_H[0] = value >> 16;
+                    }
+                break;
+            }
+        break;
+
+        case 0x04000102:
+            switch(write)
+            {
+                case false:
+                    if(mode == 2)
+                    {
+                        return io.TMCNT_C[1] << 16 | io.TMCNT_H[0];
+                    }
+                    return io.TMCNT_H[0];
+                break;
+
+                case true:
+                    if((io.TMCNT_H[0] & 0x80) == 0 && (value & 0x80) == 0x80)
+                    {
+                        io.TMCNT_C[0] = value;
+                    }
+                    io.TMCNT_H[0] = value;
+                    if(mode == 2)
+                    {
+                        io.TMCNT_L[1] = value >> 16;
+                    }
+                break;
+            }
+        break;
+
+        case 0x04000104:
+            switch(write)
+            {
+                case false:
+                    if(mode == 2)
+                    {
+                        return io.TMCNT_H[1] << 16 | io.TMCNT_C[1];
+                    }
+                    return 0x10000 - (cpu.timerScheduler[1] / cpu.timerFreqLookup[io.TMCNT_H[1] & 0x3]);
+                break;
+
+                case true:
+                    io.TMCNT_L[1] = value;
+                    if(mode == 2)
+                    {
+                        if((io.TMCNT_H[1] & 0x80) == 0 && (value & 0x80) == 0x80)
+                        {
+                            io.TMCNT_C[1] = value;
+                        }
+                        io.TMCNT_H[1] = value >> 16;
+                    }
+                break;
+            }
+        break;
+
+        case 0x04000106:
+            switch(write)
+            {
+                case false:
+                    if(mode == 2)
+                    {
+                        return io.TMCNT_C[2] << 16 | io.TMCNT_H[1];
+                    }
+                    return io.TMCNT_H[1];
+                break;
+
+                case true:
+                    if((io.TMCNT_H[1] & 0x80) == 0 && (value & 0x80) == 0x80)
+                    {
+                        io.TMCNT_C[1] = value;
+                    }
+                    io.TMCNT_H[1] = value;
+                    if(mode == 2)
+                    {
+                        io.TMCNT_L[2] = value >> 16;
+                    }
+                break;
+            }
+        break;
+
+        case 0x04000108:
+            switch(write)
+            {
+                case false:
+                    if(mode == 2)
+                    {
+                        return io.TMCNT_H[2] << 16 | io.TMCNT_C[2];
+                    }
+                    return 0x10000 - (cpu.timerScheduler[2] / cpu.timerFreqLookup[io.TMCNT_H[2] & 0x3]);
+                break;
+
+                case true:
+                    io.TMCNT_L[2] = value;
+                    if(mode == 2)
+                    {
+                        if((io.TMCNT_H[2] & 0x80) == 0 && (value & 0x80) == 0x80)
+                        {
+                            io.TMCNT_C[2] = value;
+                        }
+                        io.TMCNT_H[2] = value >> 16;
+                    }
+                break;
+            }
+        break;
+
+        case 0x0400010A:
+            switch(write)
+            {
+                case false:
+                    if(mode == 2)
+                    {
+                        return io.TMCNT_C[3] << 16 | io.TMCNT_H[2];
+                    }
+                    return io.TMCNT_H[2];
+                break;
+
+                case true:
+                    if((io.TMCNT_H[2] & 0x80) == 0 && (value & 0x80) == 0x80)
+                    {
+                        io.TMCNT_C[2] = value;
+                    }
+                    io.TMCNT_H[2] = value;
+                    if(mode == 2)
+                    {
+                        io.TMCNT_L[3] = value >> 16;
+                    }
+                break;
+            }
+        break;
+
+        case 0x0400010C:
+            switch(write)
+            {
+                case false:
+                    if(mode == 2)
+                    {
+                        return io.TMCNT_H[3] << 16 | io.TMCNT_C[3];
+                    }
+                    return 0x10000 - (cpu.timerScheduler[3] / cpu.timerFreqLookup[io.TMCNT_H[3] & 0x3]);
+                break;
+
+                case true:
+                    io.TMCNT_L[3] = value;
+                    if(mode == 2)
+                    {
+                        if((io.TMCNT_H[3] & 0x80) == 0 && (value & 0x80) == 0x80)
+                        {
+                            io.TMCNT_C[3] = value;
+                        }
+                        io.TMCNT_H[3] = value >> 16;
+                    }
+                break;
+            }
+        break;
+
+        case 0x0400010E:
+            switch(write)
+            {
+                case false:
+                    if(mode == 2)
+                    {
+                        printf("32 Bit access to 0x%X is unimplemented!  This may cause bugs!\n",location);
+                    }
+                    return io.TMCNT_H[3];
+                break;
+
+                case true:
+                    if((io.TMCNT_H[3] & 0x80) == 0 && (value & 0x80) == 0x80)
+                    {
+                        io.TMCNT_C[3] = value;
+                    }
+                    io.TMCNT_H[3] = value;
+                    if(mode == 2)
+                    {
+                        printf("32 Bit access to 0x%X is unimplemented!  This may cause bugs!\n",location);
+                    }
+                break;
+            }
+        break;
+
         case 0x04000130:
             switch(write)
             {
@@ -774,6 +996,27 @@ uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bo
             }
         break;
 
+        case 0x04000204:
+            switch(write)
+            {
+                case false: // Read
+                    if(mode == 0)
+                    {
+                        return io.WAITCNT & 0xFF;
+                    }
+                    return io.WAITCNT;
+                break;
+
+                case true: // Write
+                    io.WAITCNT = value;
+                break;
+            }
+            if(mode == 2)
+            {
+                printf("32 Bit access to 0x%X is unimplemented!  This may cause bugs!\n",location);
+            }
+        break;
+
         case 0x04000208:
             switch(write)
             {
@@ -824,7 +1067,7 @@ uint32_t gbaIO::handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bo
             //printf("IO Reg WAS NOT IMPLEMENTED!\n");
         break;
     }
-    return 0xFFFFFFFF;
+    return 0xFFFFFFFF & andTable[mode];
 }
 
 uint8_t badRamAccess;
@@ -883,10 +1126,8 @@ uint32_t andTable[3] = {
     0xFFFFFFFF
 };
 
+
 uint8_t section;
-
-
-
 
 uint32_t gbaIO::oldReadMem(uint32_t location, uint8_t mode)
 {
@@ -1423,6 +1664,10 @@ uint32_t gbaIO::oldReadMem(uint32_t location, uint8_t mode)
 
 void gbaIO::writeMem(uint32_t location, uint8_t mode, uint32_t value)
 {
+    if(location == 0x080000C4)
+    {
+        //ui.pauseEmulation = true;
+    }
     uint32_t *returnVal;
     uint16_t *returnVal16;
     //uint8_t *returnVal8;
@@ -1445,16 +1690,7 @@ void gbaIO::writeMem(uint32_t location, uint8_t mode, uint32_t value)
                                                                     // Cast it as a 16 bit pointer, and put the value into another
                                                                     // 16 bit pointer.  This allows for much faster RAM lookups
                                                                     // at the cost of big-endian compatibility
-                    switch(location2 & 0x1)
-                    {
-                        case 0:
-                            returnVal16[0] = value;
-                        break;
-
-                        case 1:
-                            returnVal16[0] = rotr16(value,8);
-                        break;
-                    }
+                    returnVal16[0] = value;
                 break;
 
                 case 2: // 32 Bit
@@ -1501,16 +1737,7 @@ void gbaIO::writeMem(uint32_t location, uint8_t mode, uint32_t value)
                                                                     // Cast it as a 16 bit pointer, and put the value into another
                                                                     // 16 bit pointer.  This allows for much faster RAM lookups
                                                                     // at the cost of big-endian compatibility
-                    switch(location2 & 0x1)
-                    {
-                        case 0:
-                            returnVal16[0] = value;
-                        break;
-
-                        case 1:
-                            returnVal16[0] = rotr16(value,8);
-                        break;
-                    }
+                    returnVal16[0] = value;
                 break;
 
                 case 2: // 32 Bit
@@ -1559,16 +1786,7 @@ void gbaIO::writeMem(uint32_t location, uint8_t mode, uint32_t value)
                                                                     // Cast it as a 16 bit pointer, and put the value into another
                                                                     // 16 bit pointer.  This allows for much faster RAM lookups
                                                                     // at the cost of big-endian compatibility
-                    switch(location2 & 0x1)
-                    {
-                        case 0:
-                            returnVal16[0] = value;
-                        break;
-
-                        case 1:
-                            returnVal16[0] = rotr16(value,8);
-                        break;
-                    }
+                    returnVal16[0] = value;
                 break;
 
                 case 2: // 32 Bit
@@ -1620,16 +1838,7 @@ void gbaIO::writeMem(uint32_t location, uint8_t mode, uint32_t value)
                                                                     // Cast it as a 16 bit pointer, and put the value into another
                                                                     // 16 bit pointer.  This allows for much faster RAM lookups
                                                                     // at the cost of big-endian compatibility
-                    switch(location2 & 0x1)
-                    {
-                        case 0:
-                            returnVal16[0] = value;
-                        break;
-
-                        case 1:
-                            returnVal16[0] = rotr16(value,8);
-                        break;
-                    }
+                    returnVal16[0] = value;
                 break;
 
                 case 2: // 32 Bit
@@ -1676,16 +1885,7 @@ void gbaIO::writeMem(uint32_t location, uint8_t mode, uint32_t value)
                                                                     // Cast it as a 16 bit pointer, and put the value into another
                                                                     // 16 bit pointer.  This allows for much faster RAM lookups
                                                                     // at the cost of big-endian compatibility
-                    switch(location2 & 0x1)
-                    {
-                        case 0:
-                            returnVal16[0] = value;
-                        break;
-
-                        case 1:
-                            returnVal16[0] = rotr16(value,8);
-                        break;
-                    }
+                    returnVal16[0] = value;
                 break;
 
                 case 2: // 32 Bit
@@ -1732,16 +1932,7 @@ void gbaIO::writeMem(uint32_t location, uint8_t mode, uint32_t value)
                                                                     // Cast it as a 16 bit pointer, and put the value into another
                                                                     // 16 bit pointer.  This allows for much faster RAM lookups
                                                                     // at the cost of big-endian compatibility
-                    switch(location2 & 0x1)
-                    {
-                        case 0:
-                            returnVal16[0] = value;
-                        break;
-
-                        case 1:
-                            returnVal16[0] = rotr16(value,8);
-                        break;
-                    }
+                    returnVal16[0] = value;
                 break;
 
                 case 2: // 32 Bit
@@ -1774,7 +1965,55 @@ void gbaIO::writeMem(uint32_t location, uint8_t mode, uint32_t value)
         break;
 
         case romLocation:
-            printf("ATTEMPTED TO WRITE TO ROM 0x%X!\n", location);
+            if(location < 0x0A000000)
+            {
+                printf("ATTEMPTED TO WRITE TO ROM 0x%X!\n", location);
+                break;
+            }
+            switch(mode)
+            {
+                case 0: // 8 Bit
+                    location -= 0x08000000; // Align Location
+                    ram.rom[location] = value;
+                break;
+
+                case 1: // 16 Bit
+                    location -= 0x08000000; // Align Location
+                    location = location & 0xFFFFFFFE;
+                    returnVal16 = (uint16_t *)(ram.rom + location);   // Make a pointer that points to the current 8 bit location,
+                                                                    // Cast it as a 16 bit pointer, and put the value into another
+                                                                    // 16 bit pointer.  This allows for much faster RAM lookups
+                                                                    // at the cost of big-endian compatibility
+                    returnVal16[0] = value;
+                break;
+
+                case 2: // 32 Bit
+                    location -= 0x08000000; // Align Location
+                    location = location & 0xFFFFFFFC;
+                    returnVal = (uint32_t *)(ram.rom + location);   // Make a pointer that points to the current 8 bit location,
+                                                                    // Cast it as a 32 bit pointer, and put the value into another
+                                                                    // 32 bit pointer.  This allows for much faster RAM lookups
+                                                                    // at the cost of big-endian compatibility
+                    switch(location2 & 0x3)
+                    {
+                        case 0:
+                            returnVal[0] = value;
+                        break;
+
+                        case 1:
+                            returnVal[0] = rotr32(value,8);
+                        break;
+
+                        case 2:
+                            returnVal[0] = rotr32(value,16);
+                        break;
+
+                        case 3:
+                            returnVal[0] = rotr32(value,24);
+                        break;
+                    }
+                break;
+            }
         break;
 
         case saveLocation:

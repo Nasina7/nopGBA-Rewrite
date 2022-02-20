@@ -1354,8 +1354,22 @@ void gbaCPU::T_BX(uint16_t opcode)
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint8_t highReg = ((opcode >> 6) & 0x1);
     Rm = Rm + (highReg * 8);
+    //printf("Loaded Location: 0x%X\n", cpu.R[Rm]);
     cpu.cpsr.T = (cpu.R[Rm] & 0x1);
+    //printf("Chosen Thumb Mode: 0x%X\n", cpu.cpsr.T);
     cpu.R[15] = (cpu.R[Rm] & 0xFFFFFFFE);
+    //printf("Jumped To 0x%X\n", cpu.R[15]);
+    if(Rm == 15)
+    {
+        if(cpu.cpsr.T == 1)
+        {
+            cpu.R[15] += 2;
+        }
+        else
+        {
+            cpu.R[15] += 4;
+        }
+    }
 }
 
 void gbaCPU::T_AND_ALU(uint16_t opcode)
@@ -1582,7 +1596,7 @@ void gbaCPU::T_SBC_ALU(uint16_t opcode)
     cpu.cpsr.N = ((result & 0x80000000) != 0);
     cpu.cpsr.Z = (result == 0);
     cpu.cpsr.C = (0xFFFFFFFF >= ((uint64_t)cpu.R[Rd] - (uint64_t)cpu.R[Rm] - (uint64_t)(!cpu.cpsr.C)));
-    cpu.cpsr.V = ( ( (uint64_t)cpu.R[Rd] ^ ( (uint64_t)cpu.R[Rm] - (uint64_t)(!cpu.cpsr.C) ) ) &
+    cpu.cpsr.V = ( ( (uint64_t)cpu.R[Rd] ^ ( (uint64_t)cpu.R[Rm] + (uint64_t)(!cpu.cpsr.C) ) ) &
                      ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
                      0x80000000 ) != 0;
 
@@ -1685,6 +1699,7 @@ void gbaCPU::T_ROR_ALU(uint16_t opcode)
 
 void gbaCPU::T_LDR_IMD(uint16_t opcode)
 {
+    //ui.pauseEmulation =true;
     uint8_t Rn = ((opcode >> 3) & 0x7);
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t imdVal = ((opcode >> 6) & 0x1F);
@@ -1782,7 +1797,7 @@ void gbaCPU::T_LDRH_IMD(uint16_t opcode)
     uint8_t Rn = ((opcode >> 3) & 0x7);
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t imdVal = ((opcode >> 6) & 0x1F);
-
+//printf("0x%X\n", cpu.R[Rn] + (imdVal << 1));
     //uint32_t address = cpu.R[Rn] + (imdVal * 2);
     cpu.R[Rd] = io.readMem(cpu.R[Rn] + (imdVal << 1),1);
     cpu.R[15] += 2;
@@ -2008,17 +2023,22 @@ void gbaCPU::T_ADJ_STACK(uint16_t opcode)
 void gbaCPU::T_SWI(uint16_t opcode)
 {
     cpu.R1314_svc[1] = (cpu.R[15] + 2);
+    //printf("Return Address: 0x%X\n", (cpu.R[15] + 2));
+    //printf("R14: 0x%X\n", cpu.R[14]);
     cpu.spsr_svc = cpu.cpsr;
-    cpu.R[15] = 0x8;
+    //printf("R14: 0x%X\n", cpu.R[14]);
+    modeSwitch(0x13);
+    //printf("R14: 0x%X\n", cpu.R[14]);
     cpu.cpsr.T = false;
     cpu.cpsr.I = true;
-    modeSwitch(0x13);
-    cpu.cpsr.mode = 0x13;
+    cpu.R[15] = 0x8;
+    //printf("R14: 0x%X\n", cpu.R[14]);
+    //cpu.cpsr.mode = 0x13;
 
-    if((opcode & 0xFF) == 0xC)
-    {
-        return;
-    }
+    //if((opcode & 0xFF) == 0xC)
+    //{
+    //    return;
+    //}
     //printf("RUNNING SOFTWARE INTERRUPT 0x%X\n",(opcode & 0xFF));
     //ui.pauseEmulation = true;
 }

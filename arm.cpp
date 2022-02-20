@@ -19,6 +19,215 @@
 #define condLessOrEqual 0xD
 #define condAlways 0xE
 
+void condEqualFunc()
+{
+    if(cpu.cpsr.Z == 0)
+    {
+        cpu.R[15] += 4;
+    }
+    if(cpu.cpsr.Z == 1)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condNotEqualFunc()
+{
+    if(cpu.cpsr.Z == 1)
+    {
+        cpu.R[15] += 4;
+    }
+    if(cpu.cpsr.Z == 0)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condCarrySetFunc()
+{
+    if(cpu.cpsr.C == 0)
+    {
+        cpu.R[15] += 4;
+    }
+    if(cpu.cpsr.C == 1)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condCarryClearFunc()
+{
+    if(cpu.cpsr.C == 1)
+    {
+        cpu.R[15] += 4;
+    }
+    if(cpu.cpsr.C == 0)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condNegativeSetFunc()
+{
+    if(cpu.cpsr.N == 0)
+    {
+        cpu.R[15] += 4;
+    }
+    if(cpu.cpsr.N == 1)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condNegativeClearFunc()
+{
+    if(cpu.cpsr.N == 1)
+    {
+        cpu.R[15] += 4;
+    }
+    if(cpu.cpsr.N == 0)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condOverflowSetFunc()
+{
+    if(cpu.cpsr.V == 0)
+    {
+        cpu.R[15] += 4;
+    }
+    if(cpu.cpsr.V == 1)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condOverflowClearFunc()
+{
+    if(cpu.cpsr.V == 1)
+    {
+        cpu.R[15] += 4;
+    }
+    if(cpu.cpsr.V == 0)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condCSetZClearFunc()
+{
+    if(cpu.cpsr.C == 0 || cpu.cpsr.Z == 1)
+    {
+        cpu.R[15] += 4;
+    }
+    if(cpu.cpsr.C == 1 && cpu.cpsr.Z == 0)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condCClearOrZSetFunc()
+{
+    if(cpu.cpsr.C == 1 && cpu.cpsr.Z == 0)
+    {
+        cpu.R[15] += 4;
+    }
+    if(cpu.cpsr.C == 0 || cpu.cpsr.Z == 1)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condGreaterThanFunc()
+{
+    if(cpu.cpsr.Z != 0)
+    {
+        cpu.R[15] += 4;
+        return;
+    }
+    if(cpu.cpsr.N != cpu.cpsr.V)
+    {
+        cpu.R[15] += 4;
+        return;
+    }
+    if(cpu.cpsr.Z == 0 && cpu.cpsr.N == cpu.cpsr.V)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condLessOrEqualFunc()
+{
+    if(cpu.cpsr.Z == 0 && cpu.cpsr.N == cpu.cpsr.V)
+    {
+        cpu.R[15] += 4;
+        return;
+    }
+    if(cpu.cpsr.Z != 0 || cpu.cpsr.N != cpu.cpsr.V)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condSignedGreaterOrEqualFunc()
+{
+    if(cpu.cpsr.V != cpu.cpsr.N)
+    {
+        cpu.R[15] += 4;
+    }
+    if(cpu.cpsr.V == cpu.cpsr.N)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condSignedLessThanFunc()
+{
+    if(cpu.cpsr.V == cpu.cpsr.N)
+    {
+        cpu.R[15] += 4;
+    }
+    if(cpu.cpsr.V != cpu.cpsr.N)
+    {
+        cpu.runARM(cpu.lastOpcodeRan);
+    }
+}
+
+void condAlwaysFunc()
+{
+   cpu.runARM(cpu.lastOpcodeRan);
+}
+
+void condNeverFunc()
+{
+    printf("Unknown Condition 0xF!\n");
+    printf("PC: 0x%X\n",cpu.R[15]);
+    ui.pauseEmulation = true;
+}
+
+typedef void (*armCondLookup)();
+
+const armCondLookup armCondLookupTable[0x10] =
+{
+    condEqualFunc,
+    condNotEqualFunc,
+    condCarrySetFunc,
+    condCarryClearFunc,
+    condNegativeSetFunc,
+    condNegativeClearFunc,
+    condOverflowSetFunc,
+    condOverflowClearFunc,
+    condCSetZClearFunc,
+    condCClearOrZSetFunc,
+    condSignedGreaterOrEqualFunc,
+    condSignedLessThanFunc,
+    condGreaterThanFunc,
+    condLessOrEqualFunc,
+    condAlwaysFunc,
+    condNeverFunc
+};
+
 void gbaCPU::decodeAndRunARM()
 {
     //uint32_t opcode = io.get32bitOpcode(cpu.R[15] - 8);
@@ -27,6 +236,9 @@ void gbaCPU::decodeAndRunARM()
     //printf("Opcode: 0x%X\n",opcode);
 
     uint8_t condition = (cpu.lastOpcodeRan >> 28);
+
+    armCondLookupTable[condition]();
+    return;
 
     switch(condition)
     {
@@ -209,14 +421,12 @@ void gbaCPU::runARM(uint32_t opcode)
     switch((opcode & 0x0E000000) >> 25) // Get XXXXYYYXXXXXXXXX
     {
         case 0: // 000
-//E12FFF1E
 
 
-            if((((opcode & 0x00000010) >> 4)) != 0 &&
-              (((opcode & 0x00000080) >> 7)) != 0
-              )
-            {// Multiplies Extra Load Stores
-                //handleMultiplyandExtra();
+            // Check for 7=1 and 4=1
+                // Checks for Multiplies / Extra Load Stores
+            if(((opcode >> 7) & 0x1) == 1 && ((opcode >> 4) & 0x1) == 1)
+            {
                 switch((opcode >> 4) & 0xF)
                 {
                     case 0x9: //Multiplies
@@ -292,288 +502,14 @@ void gbaCPU::runARM(uint32_t opcode)
                                 LDST_HWB_IMD(opcode);
                             break;
                         }
-
                     break;
                 }
-                break; // Break out of 000 Case
+                return; // Break out of run opcode
             }
-            if(((opcode & 0x00000010) >> 4) != 0)
+            // Check for 24=1 and 23=0 and 20=0
+                // Checks for Misc Instructions
+            if(((opcode >> 24) & 0x1) == 1 && ((opcode >> 23) & 0x1) == 0 && ((opcode >> 20) & 0x1) == 0)
             {
-                //printf("0x%X\n",opcode);
-                if
-                    (((opcode >> 24) & 0x1) != 0 &&
-                     ((opcode >> 23) & 0x1) == 0 &&
-                     ((opcode >> 20) & 0x1) == 0)
-                {
-                    switch((opcode >> 4) & 0xF)
-                    {
-                        case 0x0:
-                            switch((opcode >> 21) & 0x1)
-                            {
-                                case 0:
-                                    cpu.MISC_MOV_SR_R(opcode);
-                                break;
-
-                                case 1:
-                                    cpu.MISC_MOV_R_SR(opcode);
-                                break;
-                            }
-                        break;
-
-                        case 0x1:
-                            switch((opcode >> 22) & 0x1)
-                            {
-                                case 0:
-                                    cpu.BX(opcode);
-                                break;
-
-                                case 1:
-                                    printf("COUNT LEADING ZEROS NOT IMPLEMENTED!\n");
-                                    while(true)
-                                    {
-
-                                    }
-                                break;
-                            }
-                        break;
-
-                        default:
-                            printf("UNIMPLEMENTED MISC INSTRUCTION 0x%X!\n",(opcode >> 4) & 0xF);
-                            while(true)
-                            {
-                                // Temp
-                            }
-                        break;
-                    }
-                    break;
-                }
-                else
-                {
-                    switch(((opcode >> 21) & 0xF)) // DATA PROCESSING IMMEDIATE
-                    {
-                        case 0x0:
-                            cpu.DPRS_AND(opcode);
-                        break;
-
-                        case 0xC:
-                            cpu.DPRS_ORR(opcode);
-                        break;
-
-                        case 0xD:
-                            cpu.DPRS_MOV(opcode);
-                        break;
-
-                        default:
-                            printf("DPRS 0x%X NOT IMPLEMENTED!\n",((opcode >> 21) & 0xF));
-                            ui.pauseEmulation = true;
-                        break;
-                    }
-                    break;
-                }
-            }
-            else if(((opcode & 0x00000010) >> 4) == 0)
-            {
-                if
-                    (((opcode >> 24) & 0x1) != 0 &&
-                     ((opcode >> 23) & 0x1) == 0 &&
-                     ((opcode >> 20) & 0x1) == 0)
-                {
-                    switch((opcode >> 4) & 0xF)
-                    {
-                        case 0x0:
-                            switch((opcode >> 21) & 0x1)
-                            {
-                                case 0:
-                                    cpu.MISC_MOV_SR_R(opcode);
-                                break;
-
-                                case 1:
-                                    cpu.MISC_MOV_R_SR(opcode);
-                                break;
-                            }
-                        break;
-
-                        case 0x1:
-                            switch((opcode >> 22) & 0x1)
-                            {
-                                case 0:
-                                    cpu.BX(opcode);
-                                break;
-
-                                case 1:
-                                    printf("COUNT LEADING ZEROS NOT IMPLEMENTED!\n");
-                                    while(true)
-                                    {
-
-                                    }
-                                break;
-                            }
-                        break;
-
-                        default:
-                            printf("UNIMPLEMENTED MISC INSTRUCTION 0x%X!\n",(opcode >> 4) & 0xF);
-                            while(true)
-                            {
-                                // Temp
-                            }
-                        break;
-                    }
-                    break;
-                }
-                else
-                {
-                    switch(((opcode >> 21) & 0xF)) // DATA PROCESSING IMMEDIATE
-                    {
-                        case 0x0:
-                            cpu.DPIS_AND(opcode);
-                        break;
-
-                        case 0x1:
-                            cpu.DPIS_EOR(opcode);
-                        break;
-
-                        case 0x2:
-                            cpu.DPIS_SUB(opcode);
-                        break;
-
-                        case 0x3:
-                            cpu.DPIS_RSB(opcode);
-                        break;
-
-                        case 0x4:
-                            cpu.DPIS_ADD(opcode);
-                        break;
-
-                        case 0x5:
-                            cpu.DPIS_ADC(opcode);
-                        break;
-
-                        case 0x6:
-                            cpu.DPIS_SBC(opcode);
-                        break;
-
-                        case 0x7:
-                            cpu.DPIS_RSC(opcode);
-                        break;
-
-                        case 0x8:
-                            cpu.DPIS_TST(opcode);
-                        break;
-
-                        case 0x9:
-                            cpu.DPIS_TEQ(opcode);
-                        break;
-
-                        case 0xA:
-                            cpu.DPIS_CMP(opcode);
-                        break;
-
-                        case 0xB:
-                            cpu.DPIS_CMN(opcode);
-                        break;
-
-                        case 0xC:
-                            cpu.DPIS_ORR(opcode);
-                        break;
-
-                        case 0xD:
-                            cpu.DPIS_MOV(opcode);
-                        break;
-
-                        case 0xE:
-                            cpu.DPIS_BIC(opcode);
-                        break;
-
-                        case 0xF:
-                            cpu.DPIS_MVN(opcode);
-                        break;
-
-                        default:
-                            printf("IMPOSSIBLE CODE PATH!\n");
-                            ui.pauseEmulation = true;
-                        break;
-                    }
-                    break;
-                }
-            }
-
-            printf("This should hopefully not happen.  0x%X\n", opcode);
-            while(1)
-            {
-
-            }
-
-
-
-            // TODO:  NEED TO OPTIMISE THIS, THIS IS VERY INNEFFICIENT
-            // TODO:  FORMAT THIS BETTER
-
-            if((((opcode & 0x01000000) >> 24)) != 0 &&
-              (((opcode & 0x00800000) >> 23)) == 0 &&
-              (((opcode & 0x00100000) >> 20)) == 0 &&
-              (((opcode & 0x00000010) >> 4)) == 0
-              )
-            {// Miscellaneous
-                //handleMiscInstructions();
-
-                switch((opcode >> 4) & 0xF)
-                {
-                    case 0x0:
-                        switch((opcode >> 21) & 0x1)
-                        {
-                            case 0:
-                                cpu.MISC_MOV_SR_R(opcode);
-                            break;
-
-                            case 1:
-                                cpu.MISC_MOV_R_SR(opcode);
-                            break;
-                        }
-                    break;
-
-                    case 0x1:
-                        switch((opcode >> 22) & 0x1)
-                        {
-                            case 0:
-                                //branchAndExchangeOp();
-                                printf("BRANCH EXCHANGE NOT IMPLEMENTED!\n");
-                                while(true)
-                                {
-
-                                }
-                            break;
-
-                            case 1:
-                                printf("COUNT LEADING ZEROS NOT IMPLEMENTED!\n");
-                                while(true)
-                                {
-
-                                }
-                            break;
-                        }
-                    break;
-
-                    default:
-                        printf("UNIMPLEMENTED MISC INSTRUCTION 0x%X!\n",(opcode >> 4) & 0xF);
-                        while(true)
-                        {
-                            // Temp
-                        }
-                    break;
-                }
-
-
-
-                break; // Break out of 000 case
-            }
-            if((((opcode & 0x01000000) >> 24)) != 0 &&
-              (((opcode & 0x00800000) >> 23)) == 0 &&
-              (((opcode & 0x00100000) >> 20)) == 0 &&
-              (((opcode & 0x00000010) >> 4)) != 0 &&
-              (((opcode & 0x00000080) >> 7)) == 0
-              )
-            {// Miscellaneous
-
                 switch((opcode >> 4) & 0xF)
                 {
                     case 0x0:
@@ -614,33 +550,47 @@ void gbaCPU::runARM(uint32_t opcode)
                         }
                     break;
                 }
-
-
-
-                break; // Break out of 000 case
+                return;
             }
-
-            /*
-            if((((opcode & 0x01000000) >> 24)) != 0 &&
-              (((opcode & 0x00800000) >> 23)) == 0 &&
-              (((opcode & 0x00100000) >> 20)) != 0
-              )
+            // Check for 4=1
+                // Checks for Data Processing Register
+            if(((opcode >> 4) & 0x1) == 1)
             {
-                //printf("DATA!\n");
-                dataProcessingORpsrTransfer(currentOpcode);
-                break;
-            }
-            if((((opcode & 0x01000000) >> 24)) == 0 &&
-              (((opcode & 0x00800000) >> 23)) != 0
-              )
-            {
-                //printf("DATA!\n");
-                dataProcessingORpsrTransfer(currentOpcode);
-                break;
-            }
-            */
+                switch(((opcode >> 21) & 0xF)) // DATA PROCESSING IMMEDIATE
+                {
+                    case 0x0:
+                        cpu.DPRS_AND(opcode);
+                    break;
 
-            // DATA PROCESSING IMMEDIATE SHIFT
+                    case 0x2:
+                        cpu.DPRS_SUB(opcode);
+                    break;
+
+                    case 0x4:
+                        cpu.DPRS_ADD(opcode);
+                    break;
+
+                    case 0x5:
+                        cpu.DPRS_ADC(opcode);
+                    break;
+
+                    case 0xC:
+                        cpu.DPRS_ORR(opcode);
+                    break;
+
+                    case 0xD:
+                        cpu.DPRS_MOV(opcode);
+                    break;
+
+                    default:
+                        printf("DPRS 0x%X NOT IMPLEMENTED!\n",((opcode >> 21) & 0xF));
+                        ui.pauseEmulation = true;
+                    break;
+                }
+                return;
+            }
+            // Check for 4=0
+                // Checks for Data Processing Immediate Shift
             if(((opcode >> 4) & 0x1) == 0)
             {
                 switch(((opcode >> 21) & 0xF)) // DATA PROCESSING IMMEDIATE
@@ -714,36 +664,9 @@ void gbaCPU::runARM(uint32_t opcode)
                         ui.pauseEmulation = true;
                     break;
                 }
-                break;
+                return;
             }
-            // DATA PROCESSING REGISTER SHIFT
-            if(((opcode >> 4) & 0x1) == 1)
-            {
-                switch(((opcode >> 21) & 0xF)) // DATA PROCESSING IMMEDIATE
-                {
-                    case 0x0:
-                        cpu.DPRS_AND(opcode);
-                    break;
-
-                    case 0xC:
-                        cpu.DPRS_ORR(opcode);
-                    break;
-
-                    case 0xD:
-                        cpu.DPRS_MOV(opcode);
-                    break;
-
-                    default:
-                        printf("DPRS 0x%X NOT IMPLEMENTED!\n",((opcode >> 21) & 0xF));
-                        ui.pauseEmulation = true;
-                    break;
-                }
-                break;
-            }
-
-
-            printf("0001 ERROR!\n");
-            ui.pauseEmulation = true;
+            return;
         break;
 
         case 1: // 001
@@ -942,6 +865,10 @@ void gbaCPU::runARM(uint32_t opcode)
             }
         break;
 
+        case 7:
+              cpu.SWI(opcode);
+        break;
+
         default:
             printf("Unimplemented opcode 0x%X\n",opcode);
             ui.pauseEmulation = true;
@@ -950,6 +877,16 @@ void gbaCPU::runARM(uint32_t opcode)
 }
 
 // BEGINNING OF ARM OPCODES
+
+void gbaCPU::SWI(uint32_t opcode)
+{
+    cpu.R1314_svc[1] = (cpu.R[15] + 4);
+    cpu.spsr_svc = cpu.cpsr;
+    modeSwitch(0x13);
+    cpu.cpsr.T = false;
+    cpu.cpsr.I = true;
+    cpu.R[15] = 0x8;
+}
 
 void gbaCPU::BL(uint32_t opcode) // Branch or Branch with Link
 {
@@ -1154,7 +1091,7 @@ void gbaCPU::DPI_SBC(uint32_t opcode)
             cpu.cpsr.N = ((result & 0x80000000) != 0);
             cpu.cpsr.Z = (result == 0);
             cpu.cpsr.C = (0xFFFFFFFF >= ((uint64_t)cpu.R[Rn] - (uint64_t)aluVal - (uint64_t)(!cpu.cpsr.C)));
-            cpu.cpsr.V = ( ( (uint64_t)cpu.R[Rn] ^ ( (uint64_t)aluVal - (uint64_t)(!cpu.cpsr.C) ) ) &
+            cpu.cpsr.V = ( ( (uint64_t)cpu.R[Rn] ^ ( (uint64_t)aluVal + (uint64_t)(!cpu.cpsr.C) ) ) &
                      ( ( (uint64_t)cpu.R[Rn] ^ result ) ) &
                      0x80000000 ) != 0;
         }
@@ -1519,7 +1456,6 @@ void gbaCPU::DPI_MVN(uint32_t opcode)
         cpu.cpsr.N = ((cpu.R[Rd] & 0x80000000) != 0);
         cpu.cpsr.Z = (cpu.R[Rd] == 0);
         cpu.cpsr.C = carryOut;
-        cpu.cpsr.V = 1;
         if(Rd == 0xF)
         {
             //cpu.cpsr = cpu.spsr;
@@ -2318,7 +2254,6 @@ void gbaCPU::LDST_HWB_REG(uint32_t opcode)
 
 void gbaCPU::LDMIA(uint32_t opcode)
 {
-    ui.pauseEmulation = ui.allowPauseEmulation;
     cpu.R[15] += 4;
     uint8_t Rn = ((opcode >> 16) & 0xF);
     uint16_t regList = (opcode & 0xFFFF);
@@ -2364,7 +2299,8 @@ void gbaCPU::LDMIA(uint32_t opcode)
     uint8_t cpsrModeCurrent = cpu.cpsr.mode;
     if(S == 1 && setBitArray[15] == false)
     {
-        modeSwitch(0x1F);
+        //ui.pauseEmulation = true;
+        modeSwitch(0x10);
     }
 
     uint32_t endAddress = cpu.R[Rn] + (setBits * 4);
@@ -2458,7 +2394,7 @@ void gbaCPU::STMIA(uint32_t opcode)
     uint8_t cpsrModeCurrent = cpu.cpsr.mode;
     if(S == 1)
     {
-        modeSwitch(0x1F);
+        modeSwitch(0x10);
     }
 
     uint32_t endAddress = cpu.R[Rn] + (setBits * 4);
@@ -2591,7 +2527,7 @@ void gbaCPU::DPIS_AND(uint32_t opcode)
     cpu.R[Rd] = result;
 }
 
-void gbaCPU::DPRS_ORR(uint32_t opcode)
+void gbaCPU::DPRS_SUB(uint32_t opcode)
 {
     cpu.R[15] += 4;
     uint32_t value = (opcode & 0xFF);
@@ -2605,17 +2541,17 @@ void gbaCPU::DPRS_ORR(uint32_t opcode)
     switch(addrMode)
     {
         case 0: // LSL
-            if(shiftAmount == 0)
+            if((shiftAmount & 0xFF) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = cpu.cpsr.C;
             }
-            else if(shiftAmount < 32)
+            else if((shiftAmount & 0xFF) < 32)
             {
-                aluVal = (cpu.R[Rm] << shiftAmount);
-                carryOut = ( ( ( cpu.R[Rm] << ( shiftAmount - 1 ) ) & 0x80000000 ) != 0);
+                aluVal = (cpu.R[Rm] << (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] << ( (shiftAmount & 0xFF) - 1 ) ) & 0x80000000 ) != 0);
             }
-            else if(shiftAmount == 32)
+            else if((shiftAmount & 0xFF) == 32)
             {
                 aluVal = 0;
                 carryOut = (cpu.R[Rm] & 0x1);
@@ -2628,17 +2564,17 @@ void gbaCPU::DPRS_ORR(uint32_t opcode)
         break;
 
         case 1: // LSR
-            if(shiftAmount == 0)
+            if((shiftAmount & 0xFF) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = cpu.cpsr.C;
             }
-            else if(shiftAmount < 32)
+            else if((shiftAmount & 0xFF) < 32)
             {
-                aluVal = (cpu.R[Rm] >> shiftAmount);
-                carryOut = ( ( ( cpu.R[Rm] >> ( shiftAmount - 1 ) ) & 0x1 ) != 0);
+                aluVal = (cpu.R[Rm] >> (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0xFF) - 1 ) ) & 0x1 ) != 0);
             }
-            else if(shiftAmount == 32)
+            else if((shiftAmount & 0xFF) == 32)
             {
                 aluVal = 0;
                 carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
@@ -2651,15 +2587,15 @@ void gbaCPU::DPRS_ORR(uint32_t opcode)
         break;
 
         case 2: // ASR
-            if(shiftAmount == 0)
+            if((shiftAmount & 0xFF) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = cpu.cpsr.C;
             }
-            else if(shiftAmount < 32)
+            else if((shiftAmount & 0xFF) < 32)
             {
-                aluVal = ((int32_t)cpu.R[Rm] >> shiftAmount);
-                carryOut = ( ( ( cpu.R[Rm] >> ( shiftAmount - 1 ) ) & 0x1 ) != 0);
+                aluVal = ((int32_t)cpu.R[Rm] >> (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0xFF) - 1 ) ) & 0x1 ) != 0);
             }
             else
             {
@@ -2679,20 +2615,405 @@ void gbaCPU::DPRS_ORR(uint32_t opcode)
         break;
 
         case 3: // RR or RRX
-            if(shiftAmount == 0)
+            if((shiftAmount & 0xFF) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = cpu.cpsr.C;
             }
-            else if((shiftAmount & 0xF) == 0)
+            else if((shiftAmount & 0x1F) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
             }
             else
             {
-                aluVal = rotr32(cpu.R[Rm],(shiftAmount & 0xF) );
-                carryOut = ( ( ( cpu.R[Rm] >> ( shiftAmount - 1 ) ) & 0x1 ) != 0);
+                aluVal = rotr32(cpu.R[Rm],(shiftAmount & 0x1F) );
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0x1F) - 1 ) ) & 0x1 ) != 0);
+            }
+        break;
+    }
+
+
+    uint32_t result = cpu.R[Rn] - aluVal;
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            //cpu.cpsr = cpu.spsr;
+            cpu.cpsr = writeCPSR(cpu.cpsr, readCPSR(cpu.spsr),true);
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = (0xFFFFFFFF >= ((uint64_t)cpu.R[Rn] - (uint64_t)aluVal));
+            cpu.cpsr.V = (( (uint64_t)cpu.R[Rn] ^ (uint64_t)aluVal ) &
+                     ( ( (uint64_t)cpu.R[Rn] ^ result ) ) &
+                     0x80000000 ) != 0;
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[Rd] = result;
+}
+
+void gbaCPU::DPRS_ADD(uint32_t opcode)
+{
+    cpu.R[15] += 4;
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = cpu.R[((opcode >> 8) & 0xF)];
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    uint8_t Rm = ((opcode) & 0xF);
+    uint8_t addrMode = ((opcode >> 5) & 0x3);
+    uint32_t aluVal = 0;
+    bool carryOut = 0;
+    switch(addrMode)
+    {
+        case 0: // LSL
+            if((shiftAmount & 0xFF) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = cpu.cpsr.C;
+            }
+            else if((shiftAmount & 0xFF) < 32)
+            {
+                aluVal = (cpu.R[Rm] << (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] << ( (shiftAmount & 0xFF) - 1 ) ) & 0x80000000 ) != 0);
+            }
+            else if((shiftAmount & 0xFF) == 32)
+            {
+                aluVal = 0;
+                carryOut = (cpu.R[Rm] & 0x1);
+            }
+            else
+            {
+                aluVal = 0;
+                carryOut = 0;
+            }
+        break;
+
+        case 1: // LSR
+            if((shiftAmount & 0xFF) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = cpu.cpsr.C;
+            }
+            else if((shiftAmount & 0xFF) < 32)
+            {
+                aluVal = (cpu.R[Rm] >> (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0xFF) - 1 ) ) & 0x1 ) != 0);
+            }
+            else if((shiftAmount & 0xFF) == 32)
+            {
+                aluVal = 0;
+                carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
+            }
+            else
+            {
+                aluVal = 0;
+                carryOut = 0;
+            }
+        break;
+
+        case 2: // ASR
+            if((shiftAmount & 0xFF) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = cpu.cpsr.C;
+            }
+            else if((shiftAmount & 0xFF) < 32)
+            {
+                aluVal = ((int32_t)cpu.R[Rm] >> (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0xFF) - 1 ) ) & 0x1 ) != 0);
+            }
+            else
+            {
+                switch((cpu.R[Rm] & 0x80000000))
+                {
+                    case 0:
+                        aluVal = 0;
+                        carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
+                    break;
+
+                    case 0x80000000:
+                        aluVal = 0xFFFFFFFF;
+                        carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
+                    break;
+                }
+            }
+        break;
+
+        case 3: // RR or RRX
+            if((shiftAmount & 0xFF) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = cpu.cpsr.C;
+            }
+            else if((shiftAmount & 0x1F) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
+            }
+            else
+            {
+                aluVal = rotr32(cpu.R[Rm],(shiftAmount & 0x1F) );
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0x1F) - 1 ) ) & 0x1 ) != 0);
+            }
+        break;
+    }
+
+
+    uint32_t result = cpu.R[Rn] + aluVal;
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            //cpu.cpsr = cpu.spsr;
+            cpu.cpsr = writeCPSR(cpu.cpsr, readCPSR(cpu.spsr),true);
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = (0xFFFFFFFF < ((uint64_t)cpu.R[Rn] + (uint64_t)aluVal));
+            cpu.cpsr.V = ( ~ ( (uint64_t)cpu.R[Rd] ^ (uint64_t)cpu.R[Rm] ) &
+                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+                     0x80000000 ) != 0;
+            // MISSING V IMPLEMENTATION, SEE PG. 107
+        }
+    }
+    cpu.R[Rd] = result;
+}
+
+void gbaCPU::DPRS_ADC(uint32_t opcode)
+{
+    cpu.R[15] += 4;
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = cpu.R[((opcode >> 8) & 0xF)];
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    uint8_t Rm = ((opcode) & 0xF);
+    uint8_t addrMode = ((opcode >> 5) & 0x3);
+    uint32_t aluVal = 0;
+    bool carryOut = 0;
+    switch(addrMode)
+    {
+        case 0: // LSL
+            if((shiftAmount & 0xFF) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = cpu.cpsr.C;
+            }
+            else if((shiftAmount & 0xFF) < 32)
+            {
+                aluVal = (cpu.R[Rm] << (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] << ( (shiftAmount & 0xFF) - 1 ) ) & 0x80000000 ) != 0);
+            }
+            else if((shiftAmount & 0xFF) == 32)
+            {
+                aluVal = 0;
+                carryOut = (cpu.R[Rm] & 0x1);
+            }
+            else
+            {
+                aluVal = 0;
+                carryOut = 0;
+            }
+        break;
+
+        case 1: // LSR
+            if((shiftAmount & 0xFF) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = cpu.cpsr.C;
+            }
+            else if((shiftAmount & 0xFF) < 32)
+            {
+                aluVal = (cpu.R[Rm] >> (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0xFF) - 1 ) ) & 0x1 ) != 0);
+            }
+            else if((shiftAmount & 0xFF) == 32)
+            {
+                aluVal = 0;
+                carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
+            }
+            else
+            {
+                aluVal = 0;
+                carryOut = 0;
+            }
+        break;
+
+        case 2: // ASR
+            if((shiftAmount & 0xFF) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = cpu.cpsr.C;
+            }
+            else if((shiftAmount & 0xFF) < 32)
+            {
+                aluVal = ((int32_t)cpu.R[Rm] >> (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0xFF) - 1 ) ) & 0x1 ) != 0);
+            }
+            else
+            {
+                switch((cpu.R[Rm] & 0x80000000))
+                {
+                    case 0:
+                        aluVal = 0;
+                        carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
+                    break;
+
+                    case 0x80000000:
+                        aluVal = 0xFFFFFFFF;
+                        carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
+                    break;
+                }
+            }
+        break;
+
+        case 3: // RR or RRX
+            if((shiftAmount & 0xFF) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = cpu.cpsr.C;
+            }
+            else if((shiftAmount & 0x1F) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
+            }
+            else
+            {
+                aluVal = rotr32(cpu.R[Rm],(shiftAmount & 0x1F) );
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0x1F) - 1 ) ) & 0x1 ) != 0);
+            }
+        break;
+    }
+
+    uint32_t result = cpu.R[Rn] + aluVal + cpu.cpsr.C;
+    if(((opcode >> 20) & 0x1) != 0) // If bit 20 is 1
+    {
+        if(Rd == 0xF)
+        {
+            //cpu.cpsr = cpu.spsr;
+            cpu.cpsr = writeCPSR(cpu.cpsr, readCPSR(cpu.spsr),true);
+        }
+        if(Rd != 0xF)
+        {
+            cpu.cpsr.N = ((result & 0x80000000) != 0);
+            cpu.cpsr.Z = (result == 0);
+            cpu.cpsr.C = (0xFFFFFFFF < ((uint64_t)cpu.R[Rn] + (uint64_t)aluVal + (uint64_t)cpu.cpsr.C));
+            cpu.cpsr.V = ( ~ ( (uint64_t)cpu.R[Rd] ^ ( (uint64_t)cpu.R[Rm] + (uint64_t)cpu.cpsr.C ) ) &
+                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+                     0x80000000 ) != 0;
+        }
+    }
+    cpu.R[Rd] = result;
+}
+
+void gbaCPU::DPRS_ORR(uint32_t opcode)
+{
+    cpu.R[15] += 4;
+    uint32_t value = (opcode & 0xFF);
+    uint8_t shiftAmount = cpu.R[((opcode >> 8) & 0xF)];
+    uint8_t Rd = ((opcode >> 12) & 0xF);
+    uint8_t Rn = ((opcode >> 16) & 0xF);
+    uint8_t Rm = ((opcode) & 0xF);
+    uint8_t addrMode = ((opcode >> 5) & 0x3);
+    uint32_t aluVal = 0;
+    bool carryOut = 0;
+    switch(addrMode)
+    {
+        case 0: // LSL
+            if((shiftAmount & 0xFF) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = cpu.cpsr.C;
+            }
+            else if((shiftAmount & 0xFF) < 32)
+            {
+                aluVal = (cpu.R[Rm] << (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] << ( (shiftAmount & 0xFF) - 1 ) ) & 0x80000000 ) != 0);
+            }
+            else if((shiftAmount & 0xFF) == 32)
+            {
+                aluVal = 0;
+                carryOut = (cpu.R[Rm] & 0x1);
+            }
+            else
+            {
+                aluVal = 0;
+                carryOut = 0;
+            }
+        break;
+
+        case 1: // LSR
+            if((shiftAmount & 0xFF) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = cpu.cpsr.C;
+            }
+            else if((shiftAmount & 0xFF) < 32)
+            {
+                aluVal = (cpu.R[Rm] >> (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0xFF) - 1 ) ) & 0x1 ) != 0);
+            }
+            else if((shiftAmount & 0xFF) == 32)
+            {
+                aluVal = 0;
+                carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
+            }
+            else
+            {
+                aluVal = 0;
+                carryOut = 0;
+            }
+        break;
+
+        case 2: // ASR
+            if((shiftAmount & 0xFF) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = cpu.cpsr.C;
+            }
+            else if((shiftAmount & 0xFF) < 32)
+            {
+                aluVal = ((int32_t)cpu.R[Rm] >> (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0xFF) - 1 ) ) & 0x1 ) != 0);
+            }
+            else
+            {
+                switch((cpu.R[Rm] & 0x80000000))
+                {
+                    case 0:
+                        aluVal = 0;
+                        carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
+                    break;
+
+                    case 0x80000000:
+                        aluVal = 0xFFFFFFFF;
+                        carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
+                    break;
+                }
+            }
+        break;
+
+        case 3: // RR or RRX
+            if((shiftAmount & 0xFF) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = cpu.cpsr.C;
+            }
+            else if((shiftAmount & 0x1F) == 0)
+            {
+                aluVal = cpu.R[Rm];
+                carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
+            }
+            else
+            {
+                aluVal = rotr32(cpu.R[Rm],(shiftAmount & 0x1F) );
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0x1F) - 1 ) ) & 0x1 ) != 0);
             }
         break;
     }
@@ -2731,17 +3052,17 @@ void gbaCPU::DPRS_AND(uint32_t opcode)
     switch(addrMode)
     {
         case 0: // LSL
-            if(shiftAmount == 0)
+            if((shiftAmount & 0xFF) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = cpu.cpsr.C;
             }
-            else if(shiftAmount < 32)
+            else if((shiftAmount & 0xFF) < 32)
             {
-                aluVal = (cpu.R[Rm] << shiftAmount);
-                carryOut = ( ( ( cpu.R[Rm] << ( shiftAmount - 1 ) ) & 0x80000000 ) != 0);
+                aluVal = (cpu.R[Rm] << (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] << ( (shiftAmount & 0xFF) - 1 ) ) & 0x80000000 ) != 0);
             }
-            else if(shiftAmount == 32)
+            else if((shiftAmount & 0xFF) == 32)
             {
                 aluVal = 0;
                 carryOut = (cpu.R[Rm] & 0x1);
@@ -2754,17 +3075,17 @@ void gbaCPU::DPRS_AND(uint32_t opcode)
         break;
 
         case 1: // LSR
-            if(shiftAmount == 0)
+            if((shiftAmount & 0xFF) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = cpu.cpsr.C;
             }
-            else if(shiftAmount < 32)
+            else if((shiftAmount & 0xFF) < 32)
             {
-                aluVal = (cpu.R[Rm] >> shiftAmount);
-                carryOut = ( ( ( cpu.R[Rm] >> ( shiftAmount - 1 ) ) & 0x1 ) != 0);
+                aluVal = (cpu.R[Rm] >> (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0xFF) - 1 ) ) & 0x1 ) != 0);
             }
-            else if(shiftAmount == 32)
+            else if((shiftAmount & 0xFF) == 32)
             {
                 aluVal = 0;
                 carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
@@ -2777,15 +3098,15 @@ void gbaCPU::DPRS_AND(uint32_t opcode)
         break;
 
         case 2: // ASR
-            if(shiftAmount == 0)
+            if((shiftAmount & 0xFF) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = cpu.cpsr.C;
             }
-            else if(shiftAmount < 32)
+            else if((shiftAmount & 0xFF) < 32)
             {
-                aluVal = ((int32_t)cpu.R[Rm] >> shiftAmount);
-                carryOut = ( ( ( cpu.R[Rm] >> ( shiftAmount - 1 ) ) & 0x1 ) != 0);
+                aluVal = ((int32_t)cpu.R[Rm] >> (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0xFF) - 1 ) ) & 0x1 ) != 0);
             }
             else
             {
@@ -2805,20 +3126,20 @@ void gbaCPU::DPRS_AND(uint32_t opcode)
         break;
 
         case 3: // RR or RRX
-            if(shiftAmount == 0)
+            if((shiftAmount & 0xFF) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = cpu.cpsr.C;
             }
-            else if((shiftAmount & 0xF) == 0)
+            else if((shiftAmount & 0x1F) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
             }
             else
             {
-                aluVal = rotr32(cpu.R[Rm],(shiftAmount & 0xF) );
-                carryOut = ( ( ( cpu.R[Rm] >> ( shiftAmount - 1 ) ) & 0x1 ) != 0);
+                aluVal = rotr32(cpu.R[Rm],(shiftAmount & 0x1F) );
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0x1F) - 1 ) ) & 0x1 ) != 0);
             }
         break;
     }
@@ -2863,17 +3184,17 @@ void gbaCPU::DPRS_MOV(uint32_t opcode)
     switch(addrMode)
     {
         case 0: // LSL
-            if(shiftAmount == 0)
+            if((shiftAmount & 0xFF) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = cpu.cpsr.C;
             }
-            else if(shiftAmount < 32)
+            else if((shiftAmount & 0xFF) < 32)
             {
-                aluVal = (cpu.R[Rm] << shiftAmount);
-                carryOut = ( ( ( cpu.R[Rm] << ( shiftAmount - 1 ) ) & 0x80000000 ) != 0);
+                aluVal = (cpu.R[Rm] << (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] << ( (shiftAmount & 0xFF) - 1 ) ) & 0x80000000 ) != 0);
             }
-            else if(shiftAmount == 32)
+            else if((shiftAmount & 0xFF) == 32)
             {
                 aluVal = 0;
                 carryOut = (cpu.R[Rm] & 0x1);
@@ -2886,17 +3207,17 @@ void gbaCPU::DPRS_MOV(uint32_t opcode)
         break;
 
         case 1: // LSR
-            if(shiftAmount == 0)
+            if((shiftAmount & 0xFF) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = cpu.cpsr.C;
             }
-            else if(shiftAmount < 32)
+            else if((shiftAmount & 0xFF) < 32)
             {
-                aluVal = (cpu.R[Rm] >> shiftAmount);
-                carryOut = ( ( ( cpu.R[Rm] >> ( shiftAmount - 1 ) ) & 0x1 ) != 0);
+                aluVal = (cpu.R[Rm] >> (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0xFF) - 1 ) ) & 0x1 ) != 0);
             }
-            else if(shiftAmount == 32)
+            else if((shiftAmount & 0xFF) == 32)
             {
                 aluVal = 0;
                 carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
@@ -2909,15 +3230,15 @@ void gbaCPU::DPRS_MOV(uint32_t opcode)
         break;
 
         case 2: // ASR
-            if(shiftAmount == 0)
+            if((shiftAmount & 0xFF) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = cpu.cpsr.C;
             }
-            else if(shiftAmount < 32)
+            else if((shiftAmount & 0xFF) < 32)
             {
-                aluVal = ((int32_t)cpu.R[Rm] >> shiftAmount);
-                carryOut = ( ( ( cpu.R[Rm] >> ( shiftAmount - 1 ) ) & 0x1 ) != 0);
+                aluVal = ((int32_t)cpu.R[Rm] >> (shiftAmount & 0xFF));
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0xFF) - 1 ) ) & 0x1 ) != 0);
             }
             else
             {
@@ -2937,20 +3258,20 @@ void gbaCPU::DPRS_MOV(uint32_t opcode)
         break;
 
         case 3: // RR or RRX
-            if(shiftAmount == 0)
+            if((shiftAmount & 0xFF) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = cpu.cpsr.C;
             }
-            else if((shiftAmount & 0xF) == 0)
+            else if((shiftAmount & 0x1F) == 0)
             {
                 aluVal = cpu.R[Rm];
                 carryOut = ((cpu.R[Rm] & 0x80000000) != 0);
             }
             else
             {
-                aluVal = rotr32(cpu.R[Rm],(shiftAmount & 0xF) );
-                carryOut = ( ( ( cpu.R[Rm] >> ( shiftAmount - 1 ) ) & 0x1 ) != 0);
+                aluVal = rotr32(cpu.R[Rm],(shiftAmount & 0x1F));
+                carryOut = ( ( ( cpu.R[Rm] >> ( (shiftAmount & 0x1F) - 1 ) ) & 0x1 ) != 0);
             }
         break;
     }
@@ -3187,10 +3508,6 @@ void gbaCPU::DPIS_MOV(uint32_t opcode)
 
 void gbaCPU::DPIS_MVN(uint32_t opcode)
 {
-    if(ui.allowPauseEmulation)
-    {
-        ui.pauseEmulation = true;
-    }
     cpu.R[15] += 4;
     uint32_t value = (opcode & 0xFF);
     uint8_t shiftAmount = ((opcode >> 7) & 0x1F);
@@ -3273,7 +3590,6 @@ void gbaCPU::DPIS_MVN(uint32_t opcode)
             cpu.cpsr.N = ((result & 0x80000000) != 0);
             cpu.cpsr.Z = (result == 0);
             cpu.cpsr.C = carryOut;
-            cpu.cpsr.V = 1;
         }
     }
     if(Rm == 0xF)
@@ -4330,7 +4646,7 @@ void gbaCPU::DPIS_SBC(uint32_t opcode)
             cpu.cpsr.N = ((result & 0x80000000) != 0);
             cpu.cpsr.Z = (result == 0);
             cpu.cpsr.C = (0xFFFFFFFF >= ((uint64_t)cpu.R[Rn] - (uint64_t)aluVal - (uint64_t)(!cpu.cpsr.C)));
-            cpu.cpsr.V = ( ( (uint64_t)cpu.R[Rn] ^ ( (uint64_t)aluVal - (uint64_t)(!cpu.cpsr.C) ) ) &
+            cpu.cpsr.V = ( ( (uint64_t)cpu.R[Rn] ^ ( (uint64_t)aluVal + (uint64_t)(!cpu.cpsr.C) ) ) &
                      ( ( (uint64_t)cpu.R[Rn] ^ result ) ) &
                      0x80000000 ) != 0;
         }
@@ -4482,13 +4798,13 @@ void gbaCPU::UMULL(uint32_t opcode)
     uint64_t andValue = (0x1 << 63);
 
     bool S = ((opcode >> 20) & 0x1);
-    if(S == 1)
-    {
-        cpu.cpsr.N = ((result & andValue) != 0); // This looks weird lol
-        cpu.cpsr.Z = (result == 0);
-    }
     cpu.R[RdHi] = result >> 32;
     cpu.R[RdLo] = result;
+    if(S == 1)
+    {
+        cpu.cpsr.N = (((result >> 32) & 0x80000000) != 0);
+        cpu.cpsr.Z = (result == 0);
+    }
 }
 
 void gbaCPU::UMLAL(uint32_t opcode)
@@ -4508,8 +4824,10 @@ void gbaCPU::UMLAL(uint32_t opcode)
 
     uint64_t andValue = (0x1 << 63);
 
-    cpu.R[RdHi] = (result >> 32) + cpu.R[RdHi] + (0xFFFFFFFF > ((uint64_t)cpu.R[RdLo] + (uint64_t)result));
+    uint64_t carryFrom = (result & 0xFFFFFFFF) + cpu.R[RdLo];
     cpu.R[RdLo] = result + cpu.R[RdLo];
+    cpu.R[RdHi] = (result >> 32) + cpu.R[RdHi] + (carryFrom > 0xFFFFFFFF);
+    //cpu.R[RdHi] = (result >> 32) + cpu.R[RdHi] + (0xFFFFFFFF <= ((uint64_t)cpu.R[RdLo] + (uint64_t)result));
 
     bool S = ((opcode >> 20) & 0x1);
     if(S == 1)
@@ -4537,8 +4855,9 @@ void gbaCPU::SMLAL(uint32_t opcode)
 
     result = (signExtend2 * signExtend);
 
-    cpu.R[RdHi] = (result >> 32) + cpu.R[RdHi] + (0xFFFFFFFF > ((uint64_t)cpu.R[RdLo] + (uint64_t)result));
+    uint64_t carryFrom = (result & 0xFFFFFFFF) + cpu.R[RdLo];
     cpu.R[RdLo] = result + cpu.R[RdLo];
+    cpu.R[RdHi] = (result >> 32) + cpu.R[RdHi] + (carryFrom > 0xFFFFFFFF);
 
     uint64_t andValue = (0x1 << 63);
 
@@ -4557,7 +4876,7 @@ void gbaCPU::SMULL(uint32_t opcode)
     cpu.R[15] += 4;
     if(ui.allowPauseEmulation == true)
     {
-        ui.pauseEmulation = true;
+        //ui.pauseEmulation = true;
     }
     uint8_t Rm = ((opcode) & 0xF);
     uint8_t Rs = ((opcode >> 8) & 0xF);

@@ -8,6 +8,8 @@
 
 #define opPerFrame 70224
 // Normally 280896, but having trouble optimizing emu rn.
+#define modeArm 0
+#define modeThumb 1
 
 struct cpsrS {
     bool N;
@@ -43,6 +45,7 @@ class gbaCPU {
 
 
         void doOpcode();
+        void handleTimers();
         void doInterrupts();
         void handleDMA();
         uint32_t readCPSR(cpsrS value);
@@ -52,8 +55,14 @@ class gbaCPU {
         void generateThumbLookup();
 
 
-
-
+        int64_t timerScheduler[4];
+        int timerFreqLookup[4] =
+        {
+            1,
+            64,
+            256,
+            1024
+        };
 
 
 
@@ -144,10 +153,9 @@ class gbaCPU {
         void T_B_LE(uint16_t opcode);
 
         void doAudioDMATransfer(uint32_t startAddrDMA, uint32_t endAddrDMA, uint32_t wordCountDMA, uint32_t dmaControl);
-
+        void runARM(uint32_t opcode);
     private:
         void decodeAndRunARM();
-        void runARM(uint32_t opcode);
         void decodeAndRunTHUMB();
         void runTHUMB(uint16_t opcode);
 
@@ -157,6 +165,8 @@ class gbaCPU {
 
         // Full opcode list
         // ARM
+
+        void SWI(uint32_t opcode);
         void STMIA(uint32_t opcode);
         void LDMIA(uint32_t opcode);
 
@@ -189,6 +199,9 @@ class gbaCPU {
         void DPIS_TST(uint32_t opcode);
 
         void DPRS_AND(uint32_t opcode);
+        void DPRS_SUB(uint32_t opcode);
+        void DPRS_ADD(uint32_t opcode);
+        void DPRS_ADC(uint32_t opcode);
         void DPRS_ORR(uint32_t opcode);
         void DPRS_MOV(uint32_t opcode);
 

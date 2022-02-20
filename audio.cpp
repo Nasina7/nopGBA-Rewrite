@@ -7,6 +7,7 @@ gbaAudio audio;
 
 void audioCallback(void* userdata, Uint8* stream, int len)
 {
+    //printf("len: 0x%X\n", len);
     static bool firstRun = false;
 
     if(firstRun == false)
@@ -24,7 +25,7 @@ void audioCallback(void* userdata, Uint8* stream, int len)
 
     firstRun = true;
 
-
+    /*
     io.dmaControl[1] |= 0x8000;
     if((io.dmaControl[1] & 0x200) == 0)
     {
@@ -64,14 +65,20 @@ void audioCallback(void* userdata, Uint8* stream, int len)
 
 
 
+
     audio.inAudioCallback = false;
     io.dmaControl[1] |= 0x200;
+    */
+    audio.inAudioCallback = true;
     //cpu.doAudioDMATransfer(io.dmaStartAddress[1], io.dmaEndAddress[1], io.dmaWordCount[1], io.dmaControl[1]);
+
+    cpu.handleDMA();
     for(int i = 0; i < len; i++)
     {
         //stream[i] = io.readMem(0x03005a20 + (i / 4), 0);
-        stream[i] = audio.samples[(i / 2) / 2];
-        //stream[i] = audio.megalovaniaTest[((audio.megaloTestCount + len) - i) / 2];
+        stream[i] = audio.samples[i / 4];
+        //stream[i] = audio.megalovaniaTest[audio.megaloTestCount / 2];
+        audio.megaloTestCount++;
 
         //audio.frameSamples[audio.frameSampleCount] = audio.samples[i / 2];
         audio.frameSampleCount++;

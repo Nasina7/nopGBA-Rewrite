@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl.h"
+#include "ui.hpp"
 
 gbaInput input;
 
@@ -115,6 +116,10 @@ void gbaInput::handleInput()
         if (SDL_EVENT_HANDLING.type == SDL_KEYUP)
         {
             handleControlsr();
+        }
+        if(SDL_EVENT_HANDLING.type == SDL_QUIT)
+        {
+            ui.endEmulator = true;
         }
     }
 }

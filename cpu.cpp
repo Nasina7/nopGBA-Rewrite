@@ -7,9 +7,6 @@
 
 gbaCPU cpu;
 
-#define modeArm 0
-#define modeThumb 1
-
 
 
 uint32_t gbaCPU::readCPSR(cpsrS value)
@@ -120,16 +117,16 @@ uint8_t gbaCPU::modeSwitch(uint8_t switchMode)
 
                 case 0x13: // Supervisor
                     swapVal = cpu.R[13];
-                    cpu.R[13] = cpu.R1314_svc[0];
-                    cpu.R1314_svc[0] = swapVal;
+                    cpu.R[13] = cpu.R1314_irq[0];
+                    cpu.R1314_irq[0] = swapVal;
 
                     swapVal = cpu.R[14];
-                    cpu.R[14] = cpu.R1314_svc[1];
-                    cpu.R1314_svc[1] = swapVal;
+                    cpu.R[14] = cpu.R1314_irq[1];
+                    cpu.R1314_irq[1] = swapVal;
 
                     swapCPSR = cpu.spsr;
-                    cpu.spsr = cpu.spsr_svc;
-                    cpu.spsr_svc = swapCPSR;
+                    cpu.spsr = cpu.spsr_irq;
+                    cpu.spsr_irq = swapCPSR;
                 break;
 
                 case 0x1F: // System
@@ -171,16 +168,16 @@ uint8_t gbaCPU::modeSwitch(uint8_t switchMode)
 
                 case 0x12: // IRQ
                     swapVal = cpu.R[13];
-                    cpu.R[13] = cpu.R1314_irq[0];
-                    cpu.R1314_irq[0] = swapVal;
+                    cpu.R[13] = cpu.R1314_svc[0];
+                    cpu.R1314_svc[0] = swapVal;
 
                     swapVal = cpu.R[14];
-                    cpu.R[14] = cpu.R1314_irq[1];
-                    cpu.R1314_irq[1] = swapVal;
+                    cpu.R[14] = cpu.R1314_svc[1];
+                    cpu.R1314_svc[1] = swapVal;
 
                     swapCPSR = cpu.spsr;
-                    cpu.spsr = cpu.spsr_irq;
-                    cpu.spsr_irq = swapCPSR;
+                    cpu.spsr = cpu.spsr_svc;
+                    cpu.spsr_svc = swapCPSR;
                 break;
 
                 case 0x1F: // System
@@ -244,6 +241,7 @@ uint8_t gbaCPU::modeSwitch(uint8_t switchMode)
             printf("Unknown Mode Switch 0x%X!\n",switchMode);
         break;
     }
+    cpu.cpsr.mode = switchMode;
     return 0;
 }
 
@@ -254,6 +252,14 @@ void gbaCPU::doInterrupts()
     if(io.IME == true && cpu.cpsr.I == 0)
     {
         intToHandle = io.IE & io.IF;
+        //if((intToHandle & 0x1) == 1 && (((io.dispStat) & 0x8) == 0))
+        //{
+            //intToHandle &= 0xFFFE;
+        //}
+        //if((intToHandle & 0x4) == 4 && (((io.dispStat) & 0x20) == 0))
+        //{
+            //intToHandle &= 0xFFFB;
+        //}
 
         if(intToHandle != 0x0)
         {
@@ -263,7 +269,7 @@ void gbaCPU::doInterrupts()
             cpu.modeSwitch(0x12);
             cpu.cpsr.I = 1;
             cpu.cpsr.T = 0;
-            cpu.cpsr.mode = 0x12;
+            //cpu.cpsr.mode = 0x12;
 
             //printf("PC: 0x%X\n",cpu.R[15]);
             //ui.pauseEmulation = true;
@@ -310,7 +316,7 @@ void doDMATransfer1(uint32_t startAddrDMA, uint32_t endAddrDMA, uint32_t wordCou
 {
 
     bool dmaWriteMode = ((dmaControl & (0x1 << 10)) != 0);
-    printf("DMALOC: 0x%X\n",startAddrDMA);
+    //printf("DMALOC: 0x%X\n",startAddrDMA);
 
     wordCountDMA = 4;
     audio.streamCounter = 0;
@@ -320,11 +326,15 @@ void doDMATransfer1(uint32_t startAddrDMA, uint32_t endAddrDMA, uint32_t wordCou
         for(int x = 0; x < 4; x++)
         {
             audio.samples[((i) * 4) + x] = io.readMem(startAddrDMA + (i * 4) + x, 0);
+            //audio.samples[((i) * 4) + x] = audio.megalovaniaTest[audio.megaloTestCount];
+            //audio.megaloTestCount++;
         }
     }
 
+    //printf("Before: 0x%X\n", io.lastStartAddr[1]);
     startAddrDMA += 16;
-
+    io.lastStartAddr[1] = startAddrDMA;
+    //printf("After: 0x%X\n", io.lastStartAddr[1]);
 
     /*
     while(wordCountDMA != 0)
@@ -359,7 +369,6 @@ void doDMATransfer1(uint32_t startAddrDMA, uint32_t endAddrDMA, uint32_t wordCou
     */
     //if(io.dmaControl[1] & 0x200 != 0)
     //{
-        io.lastStartAddr[1] = startAddrDMA;
     //}
    // printf("DMA FINISH!\n");
 }
@@ -505,10 +514,10 @@ void gbaCPU::handleDMA()
         }
         if(((dmaControl & (0x1 << 13)) != 0) != 0 || ((dmaControl & (0x1 << 12)) != 0) != 0)
         {
-            //printf("DMA TIMING IS NOT IMPLEMENTED!\n");
+            printf("DMA 0 TIMING IS NOT IMPLEMENTED!\n");
         }
     }
-    if((io.dmaControl[1] & 0x8000) != 0 && audio.inAudioCallback == true)
+    if((io.dmaControl[1] & 0x8000) != 0)
     {
         uint16_t dmaControl = io.dmaControl[1];
         if(((dmaControl & (0x1 << 13)) != 0) != 0 && ((dmaControl & (0x1 << 12)) != 0) != 0)
@@ -558,22 +567,71 @@ void gbaCPU::handleDMA()
         }
         else if(((dmaControl & (0x1 << 13)) != 0) != 0 || ((dmaControl & (0x1 << 12)) != 0) != 0)
         {
-            //printf("DMA TIMING IS NOT IMPLEMENTED!\n");
+
+            printf("DMA 3 TIMING IS NOT IMPLEMENTED!\n");
         }
     }
 }
 
+void gbaCPU::handleTimers()
+{
+    if(((io.TMCNT_H[0] | io.TMCNT_H[1] | io.TMCNT_H[2] | io.TMCNT_H[3]) & 0x80) == 0)
+    {
+        return;
+    }
+    // THIS FUNCTION MUST RUN ONCE PER OPCODE BECAUSE OF THIS.  MUST BE CHANGED WHEN ADDING PROPER TIMING
+    for(int i = 0; i < 4; i++)
+    {
+        if((io.TMCNT_H[i] & 0x80) == 0)
+        {
+            continue;
+        }
+        cpu.timerScheduler[i]--;
+        if(cpu.timerScheduler[i] <= 0)
+        {
+            cpu.timerScheduler[i] += (timerFreqLookup[io.TMCNT_H[i] & 0x3]);
+            cpu.timerScheduler[i] *= (0x10000 - io.TMCNT_L[i]);
+
+            //uint16_t prevTimer = io.TMCNT_C[i];
+            //io.TMCNT_C[i]++;
+            //if(prevTimer >= io.TMCNT_C[i])
+            //{
+                // Overflow
+                //io.TMCNT_C[i] = io.TMCNT_L[i];
+                if((io.TMCNT_H[i] & 0x40) == 0x40)
+                {
+                    //printf("OVERFLOW\n");
+                    io.IF |= 0x1 << (3 + i);
+                }
+                if((io.SOUNDCNT_H & 0x400) == 0 && i == 1)
+                {
+                    //printf("what3: 0x%X\n", io.TMCNT_H[i]);
+                    io.dmaControl[1] |= 0x8000;
+                }
+            //}
+        }
+    }
+}
 
 void gbaCPU::doOpcode()
 {
-    if(cpu.cpsr.T == modeThumb)
+    //runTHUMB(0);
+    //return;
+    if(ui.experimentalSpeedup == true)
     {
-        cpu.runTHUMB(io.readMem(cpu.R[15], 1));
+        if(cpu.R[15] == 0x358 && io.IF == 0)
+        {
+            return;
+        }
+    }
+    if(cpu.cpsr.T == modeArm)
+    {
+        cpu.decodeAndRunARM();
         return;
     }
     else
     {
-        decodeAndRunARM();
+        cpu.runTHUMB(io.readMem(cpu.R[15], 1));
         return;
     }
     /*

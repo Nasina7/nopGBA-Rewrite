@@ -4,6 +4,335 @@
 
 gbaDisplay screen;
 
+void gbaDisplay::drawScreenScanline()
+{
+    switch(io.lcdControl & 0x7)
+    {
+        case 0:
+            screen.drawScreenMode0Scanline();
+        break;
+
+        case 1:
+            screen.drawScreenMode0Scanline();
+        break;
+
+        case 2:
+            screen.drawScreenMode0Scanline();
+        break;
+
+        case 4:
+            //screen.drawScreenMode4();
+        break;
+
+        default:
+
+        break;
+    }
+}
+
+void gbaDisplay::drawScreenMode0Scanline()
+{
+    drawBGMode0Scanline(0xFF);
+    for(int i = 3; i != -1; i--)
+    {
+        for(int x = 3; x != -1; x--)
+        {
+            if((io.bgCNT[x] & 0x3) == i)
+            {
+                drawBGMode0Scanline(x);
+            }
+        }
+    }
+    //drawBGMode0(0xFF);
+    //drawBGMode0(3);
+    //drawBGMode0(2);
+    //drawBGMode0(1);
+    //drawBGMode0(0);
+
+    //drawSpritesScanline();
+
+    //printf("BG: 0x%X\n", io.bgXScroll[2] / 8);
+    //printf("Successful Exit\n");
+}
+
+void gbaDisplay::drawBGMode0Scanline(uint8_t bgNum)
+{/*
+    if(bgNum == 0xFF)
+    {
+        uint16_t color = ram.bg_ObjPal[0x1] << 8 | ram.bg_ObjPal[0];
+        //printf("CLR\n");
+        for(int x = 0; x < 240; x++)
+        {
+            screenArray[io.VCOUNT][x] = (0xFF << 24) |
+                                ((((color >> 10) & 0x1F) << 3) << 16) |
+                                ((((color >> 5) & 0x1F) << 3) << 8) |
+                                (((color & 0x1F) << 3));
+        }
+        return;
+    }
+    if( ( ( io.lcdControl >> (8 + bgNum) ) & 0x1 ) == 0)
+    {
+        if(forceDrawBGs == false)
+        {
+            return;
+        }
+
+    }
+    if(forceDrawBGs == true && forceDrawBg[bgNum] == false)
+    {
+        return;
+    }
+
+    uint8_t bg0priority = ((io.bgCNT[bgNum]) & 0x3);
+    uint8_t bg0charBlock = ((io.bgCNT[bgNum] >> 2) & 0x3);
+    bool bg0bpp = ((io.bgCNT[bgNum] >> 7) & 1);
+    uint8_t bg0mapBlock = ((io.bgCNT[bgNum] >> 8) & 0x1F);
+
+    uint32_t bg0mapLocation = 0x06000000 + (bg0mapBlock * 0x800);
+
+    uint32_t bg0tileLocation = 0x06000000 + (bg0charBlock * 0x4000);
+
+    uint8_t xMod, yMod;
+    switch(io.bgCNT[bgNum] >> 14)
+    {
+        case 0:
+            xMod = 0x20;
+            yMod = 0x20;
+        break;
+
+        case 1:
+            xMod = 0x40;
+            yMod = 0x20;
+        break;
+
+        case 2:
+            xMod = 0x20;
+            yMod = 0x40;
+        break;
+
+        case 3:
+            xMod = 0x40;
+            yMod = 0x40;
+        break;
+    }
+    //printf("bg0tileLocation: 0x%X\n",bg0tileLocation);
+
+
+    uint8_t fineX, fineY;
+    fineX = io.bgXScroll[bgNum] & 0x7;
+    fineY = io.bgYScroll[bgNum] & 0x7;
+
+
+
+
+
+
+
+
+
+
+
+
+
+    for(int xTile = 0; xTile < 0x1F; xTile++)
+    {
+        //printf("xTile: 0x%X\n",xTile);
+        uint32_t xAmount = (xTile << 1) + ((io.bgXScroll[bgNum] >> 2));
+        xAmount = xTile + ((io.bgXScroll[bgNum] >> 3));
+        xAmount &= 0x3F;
+
+        if(xAmount >= 0x20)
+        {
+            xAmount &= 0x1F;
+            switch(io.bgCNT[bgNum] >> 14)
+            {
+                case 1:
+                    xAmount += 0x400;
+                break;
+
+                case 3:
+                    xAmount += 0x400;
+                break;
+            }
+        }
+
+        xAmount = xAmount << 1;
+
+        uint32_t yAmount = ((io.VCOUNT / 8) * 0x40) + (((io.bgYScroll[bgNum] / 8) * 0x40));
+        yAmount = (io.VCOUNT / 8) + (io.bgYScroll[bgNum] / 8);
+        yAmount & 0x3F;
+        if(yAmount >= 0x20)
+        {
+            yAmount &= 0x1F;
+            switch(io.bgCNT[bgNum] >> 14)
+            {
+                case 2:
+                    yAmount += 0x800;
+                break;
+
+                case 3:
+                    yAmount += 0x800;
+                break;
+            }
+        }
+        yAmount *= 0x40;
+        // By this point, we have the tile index
+        //xAmount %= (xMod * 4);
+        //yAmount %= (yMod * 0x80);
+        uint8_t trueFineY = (io.VCOUNT % 8) + fineY;
+        trueFineY %= 8;
+        uint32_t curTileLocation = bg0mapLocation + xAmount + yAmount + ((((io.VCOUNT % 8) + fineY) / 8) * 4);
+        //(yTile * 0x400) + (xTile * 0x40) + (y * 8) + (x * 1);
+        uint16_t tileData = io.readMem(curTileLocation, 1);
+        uint16_t prevTileData = tileData;
+        //curTileLocation &= 0x17FFE;
+
+
+        //tileData = ram.video[curTileLocation + 1] << 8 | ram.video[curTileLocation];
+
+        //if(prevTileData != tileData)
+        //{
+            //printf("curTileLocation: 0x%X  Correct: 0x%X  Broken: 0x%X  BGMAP: 0x%X\nSomeones being a little sussy...", curTileLocation, prevTileData, tileData, bg0mapBlock);
+
+        //}
+        //tileData = ((uint16_t *)(ram.video + curTileLocation ))[0];
+
+
+            for(int x = 0; x != 8; x += 1)
+            {
+                //printf("x: 0x%X\n",x);
+
+                uint32_t curTileDataLocation;
+                uint8_t palNum;
+
+                uint8_t tileDataTrue;
+
+                uint32_t location;
+
+                uint8_t colorIndex;
+
+                if((io.bgCNT[bgNum] & 0x80) == 0x00)
+                {
+                    curTileDataLocation = bg0tileLocation + ((tileData & 0x3FF) << 5) + ((y) << 2) + ((x) >> 1);
+                    palNum = (tileData >> 12) & 0xF;
+
+                    tileDataTrue = io.readMem(curTileDataLocation, 0);
+
+                    //location = 0x05000000 + ((tileDataTrue & 0xF) << 2);
+
+                    switch(x & 0x1)
+                    {
+                        case 0:
+                            colorIndex = ((tileDataTrue & 0xF) << 1);
+                        break;
+
+                        case 1:
+                            colorIndex = (((tileDataTrue >> 4) & 0xF) << 1);
+                        break;
+                    }
+                    location = 0x05000000 | colorIndex;
+                }
+                else
+                {
+                    curTileDataLocation = bg0tileLocation + (((tileData * 2) & 0x3FF) * 0x20) + ((y) * 8) + ((x));
+                    palNum = (tileData >> 12) & 0xF;
+
+                    tileDataTrue = io.readMem(curTileDataLocation, 0);
+
+                    location = 0x05000000 + ((tileDataTrue & 0xF) * 2) + ((tileDataTrue >> 4) * 0x20);
+
+                    location = 0x05000000 + ((tileDataTrue & 0xFF) * 2);
+                    colorIndex = ((tileDataTrue & 0xFF) * 2);
+                }
+
+                uint16_t colorRGB = io.readMem(location + (palNum * 0x20), 1);
+
+                uint32_t color = (0xFF000000) |
+                                   ((((colorRGB) & 0x7C00) << 9)) |
+                                   ((((colorRGB) & 0x3E0) << 6)) |
+                                   (((colorRGB & 0x1F) << 3));
+                //printf("XWRITE: %i\n",x + (xTile * 8));
+                //printf("YWRITE: %i\n",y + (yTile * 8));
+                int finalX = x;
+                int finalY = y;
+                if(colorIndex != 0)
+                {
+                    switch((tileData >> 10) & 0x3)
+                    {
+                        case 0:
+                        {
+                            uint16_t xWrite = (finalX + (xTile * 8)) - fineX;
+                            uint16_t yWrite = ((finalY) + (yTile * 8)) - fineY;
+                            if(xWrite >= 240)
+                            {
+                                break;
+                            }
+                            if(yWrite >= 160)
+                            {
+                                break;
+                            }
+                            screenArray[yWrite][xWrite] = color;
+                        }
+                        break;
+
+                        case 1:
+                        {
+                            uint16_t xWrite = ((7 - finalX) + (xTile * 8)) - fineX;
+                            uint16_t yWrite = ((finalY) + (yTile * 8)) - fineY;
+                            if(xWrite >= 240)
+                            {
+                                break;
+                            }
+                            if(yWrite >= 160)
+                            {
+                                break;
+                            }
+                            screenArray[yWrite][xWrite] =  color;
+                        }
+                        break;
+
+                        case 2:
+                        {
+                            uint16_t xWrite = (finalX + (xTile * 8)) - fineX;
+                            uint16_t yWrite = ((7 - finalY) + (yTile * 8)) - fineY;
+                            if(xWrite >= 240)
+                            {
+                                break;
+                            }
+                            if(yWrite >= 160)
+                            {
+                                break;
+                            }
+                            screenArray[yWrite][xWrite] =  color;
+                        }
+                        break;
+
+                        case 3:
+                        {
+                            uint16_t xWrite = ((7 - finalX) + (xTile * 8)) - fineX;
+                            uint16_t yWrite = ((7 - finalY) + (yTile * 8)) - fineY;
+                            if(xWrite >= 240)
+                            {
+                                break;
+                            }
+                            if(yWrite >= 160)
+                            {
+                                break;
+                            }
+                            screenArray[yWrite][xWrite] = color;
+                        }
+                        break;
+                    }
+                }
+
+                //printf("SUCCESSFULLY WROTE\n");
+            }
+            //printf("Exit X Loop\n");
+        //printf("Exit Y Loop\n");
+    }
+    */
+}
+
 void gbaDisplay::drawScreen()
 {
     switch(io.lcdControl & 0x7)
@@ -20,12 +349,20 @@ void gbaDisplay::drawScreen()
             screen.drawScreenMode0();
         break;
 
+        case 3:
+            screen.drawScreenMode3();
+        break;
+
         case 4:
             screen.drawScreenMode4();
         break;
 
-        default:
+        case 5:
+            screen.drawScreenMode4();
+        break;
 
+        default:
+            screen.drawScreenMode0();
         break;
     }
     //printf("Successful Return\n");
@@ -354,13 +691,13 @@ void gbaDisplay::drawBGMode0(uint8_t bgNum)
         for(int xTile = 0; xTile < 0x1F; xTile++)
         {
             //printf("xTile: 0x%X\n",xTile);
-            uint32_t xAmount = (xTile * 2) + ((((io.bgXScroll[bgNum] / 8)) * 2));
-            xAmount = xTile + ((io.bgXScroll[bgNum] / 8));
-            xAmount %= 0x40;
+            uint32_t xAmount = (xTile << 1) + ((io.bgXScroll[bgNum] >> 2));
+            xAmount = xTile + ((io.bgXScroll[bgNum] >> 3));
+            xAmount &= 0x3F;
 
             if(xAmount >= 0x20)
             {
-                xAmount %= 0x20;
+                xAmount &= 0x1F;
                 switch(io.bgCNT[bgNum] >> 14)
                 {
                     case 1:
@@ -373,14 +710,14 @@ void gbaDisplay::drawBGMode0(uint8_t bgNum)
                 }
             }
 
-            xAmount *= 2;
+            xAmount = xAmount << 1;
 
             uint32_t yAmount = (yTile * 0x40) + (((io.bgYScroll[bgNum] / 8) * 0x40));
             yAmount = yTile + (io.bgYScroll[bgNum] / 8);
-            yAmount %= 0x40;
+            yAmount & 0x3F;
             if(yAmount >= 0x20)
             {
-                yAmount %= 0x20;
+                yAmount &= 0x1F;
                 switch(io.bgCNT[bgNum] >> 14)
                 {
                     case 2:
@@ -419,29 +756,55 @@ void gbaDisplay::drawBGMode0(uint8_t bgNum)
                 {
                     //printf("x: 0x%X\n",x);
 
-                    uint32_t curTileDataLocation = bg0tileLocation + ((tileData & 0x3FF) * 0x20) + ((y) * 4) + ((x) / 2);
-                    uint8_t palNum = (tileData >> 12) & 0xF;
+                    uint32_t curTileDataLocation;
+                    uint8_t palNum;
 
-                    uint8_t tileDataTrue = io.readMem(curTileDataLocation, 0);
+                    uint8_t tileDataTrue;
 
-                    uint32_t location = 0x05000000 + ((tileDataTrue & 0xF) * 2) + ((tileDataTrue >> 4) * 0x20);
+                    uint32_t location;
 
                     uint8_t colorIndex;
 
-                    switch(x % 2)
+                    if((io.bgCNT[bgNum] & 0x80) == 0x00)
                     {
-                        case 0:
-                            location = 0x05000000 + ((tileDataTrue & 0xF) * 2);
-                            colorIndex = ((tileDataTrue & 0xF) * 2);
-                        break;
+                        curTileDataLocation = bg0tileLocation + ((tileData & 0x3FF) << 5) + ((y) << 2) + ((x) >> 1);
+                        palNum = (tileData >> 12) & 0xF;
 
-                        case 1:
-                            location = 0x05000000 + (((tileDataTrue >> 4) & 0xF) * 2);
-                            colorIndex = (((tileDataTrue >> 4) & 0xF) * 2);
-                        break;
+                        tileDataTrue = io.readMem(curTileDataLocation, 0);
+
+                        //location = 0x05000000 + ((tileDataTrue & 0xF) << 2);
+
+                        switch(x & 0x1)
+                        {
+                            case 0:
+                                colorIndex = ((tileDataTrue & 0xF) << 1);
+                            break;
+
+                            case 1:
+                                colorIndex = (((tileDataTrue >> 4) & 0xF) << 1);
+                            break;
+                        }
+                        location = 0x05000000 | colorIndex;
+                    }
+                    else
+                    {
+                        curTileDataLocation = bg0tileLocation + (((tileData * 2) & 0x3FF) * 0x20) + ((y) * 8) + ((x));
+                        palNum = (tileData >> 12) & 0xF;
+
+                        tileDataTrue = io.readMem(curTileDataLocation, 0);
+
+                        location = 0x05000000 + ((tileDataTrue & 0xF) * 2) + ((tileDataTrue >> 4) * 0x20);
+
+                        location = 0x05000000 + ((tileDataTrue & 0xFF) * 2);
+                        colorIndex = ((tileDataTrue & 0xFF) * 2);
                     }
 
-                    uint16_t color = io.readMem(location + (palNum * 0x20), 1);
+                    uint16_t colorRGB = io.readMem(location + (palNum * 0x20), 1);
+
+                    uint32_t color = (0xFF000000) |
+                                       ((((colorRGB) & 0x7C00) << 9)) |
+                                       ((((colorRGB) & 0x3E0) << 6)) |
+                                       (((colorRGB & 0x1F) << 3));
                     //printf("XWRITE: %i\n",x + (xTile * 8));
                     //printf("YWRITE: %i\n",y + (yTile * 8));
                     int finalX = x;
@@ -451,63 +814,67 @@ void gbaDisplay::drawBGMode0(uint8_t bgNum)
                         switch((tileData >> 10) & 0x3)
                         {
                             case 0:
-                                if((finalX + (xTile * 8)) - fineX < 0 || (finalX + (xTile * 8)) - fineX >= 240)
+                            {
+                                uint16_t xWrite = (finalX + (xTile * 8)) - fineX;
+                                uint16_t yWrite = ((finalY) + (yTile * 8)) - fineY;
+                                if(xWrite >= 240)
                                 {
                                     break;
                                 }
-                                if(((finalY) + (yTile * 8)) - fineY < 0 || ((finalY) + (yTile * 8)) - fineY >= 160)
+                                if(yWrite >= 160)
                                 {
                                     break;
                                 }
-                                screenArray[(finalY) + (yTile * 8) - fineY][finalX + (xTile * 8) - fineX] = (0xFF << 24) |
-                                       ((((color >> 10) & 0x1F) << 3) << 16) |
-                                       ((((color >> 5) & 0x1F) << 3) << 8) |
-                                       (((color & 0x1F) << 3));
+                                screenArray[yWrite][xWrite] = color;
+                            }
                             break;
 
                             case 1:
-                                if(((7 - finalX) + (xTile * 8)) - fineX < 0 || ((7 - finalX) + (xTile * 8)) - fineX >= 240)
+                            {
+                                uint16_t xWrite = ((7 - finalX) + (xTile * 8)) - fineX;
+                                uint16_t yWrite = ((finalY) + (yTile * 8)) - fineY;
+                                if(xWrite >= 240)
                                 {
                                     break;
                                 }
-                                if(((finalY) + (yTile * 8)) - fineY < 0 || ((finalY) + (yTile * 8)) - fineY >= 160)
+                                if(yWrite >= 160)
                                 {
                                     break;
                                 }
-                                screenArray[(finalY) + (yTile * 8) - fineY][(7 - finalX) + (xTile * 8) - fineX] = (0xFF << 24) |
-                                       ((((color >> 10) & 0x1F) << 3) << 16) |
-                                       ((((color >> 5) & 0x1F) << 3) << 8) |
-                                       (((color & 0x1F) << 3));
+                                screenArray[yWrite][xWrite] =  color;
+                            }
                             break;
 
                             case 2:
-                                if((finalX + (xTile * 8)) - fineX < 0 || (finalX + (xTile * 8)) - fineX >= 240)
+                            {
+                                uint16_t xWrite = (finalX + (xTile * 8)) - fineX;
+                                uint16_t yWrite = ((7 - finalY) + (yTile * 8)) - fineY;
+                                if(xWrite >= 240)
                                 {
                                     break;
                                 }
-                                if(((7 - finalY) + (yTile * 8)) - fineY < 0 || ((7 - finalY) + (yTile * 8)) - fineY >= 160)
+                                if(yWrite >= 160)
                                 {
                                     break;
                                 }
-                                screenArray[(7 - finalY) + (yTile * 8) - fineY][finalX + (xTile * 8) - fineX] = (0xFF << 24) |
-                                       ((((color >> 10) & 0x1F) << 3) << 16) |
-                                       ((((color >> 5) & 0x1F) << 3) << 8) |
-                                       (((color & 0x1F) << 3));
+                                screenArray[yWrite][xWrite] =  color;
+                            }
                             break;
 
                             case 3:
-                                if(((7 - finalX) + (xTile * 8)) - fineX < 0 || ((7 - finalX) + (xTile * 8)) - fineX >= 240)
+                            {
+                                uint16_t xWrite = ((7 - finalX) + (xTile * 8)) - fineX;
+                                uint16_t yWrite = ((7 - finalY) + (yTile * 8)) - fineY;
+                                if(xWrite >= 240)
                                 {
                                     break;
                                 }
-                                if(((7 - finalY) + (yTile * 8)) - fineY < 0 || ((7 - finalY) + (yTile * 8)) - fineY >= 160)
+                                if(yWrite >= 160)
                                 {
                                     break;
                                 }
-                                screenArray[(7 - finalY) + (yTile * 8) - fineY][(7 - finalX) + (xTile * 8) - fineX] = (0xFF << 24) |
-                                       ((((color >> 10) & 0x1F) << 3) << 16) |
-                                       ((((color >> 5) & 0x1F) << 3) << 8) |
-                                       (((color & 0x1F) << 3));
+                                screenArray[yWrite][xWrite] = color;
+                            }
                             break;
                         }
                     }
@@ -526,10 +893,21 @@ void gbaDisplay::drawBGMode0(uint8_t bgNum)
 void gbaDisplay::drawScreenMode0()
 {
     drawBGMode0(0xFF);
-    drawBGMode0(3);
-    drawBGMode0(2);
-    drawBGMode0(1);
-    drawBGMode0(0);
+    for(int i = 3; i != -1; i--)
+    {
+        for(int x = 3; x != -1; x--)
+        {
+            if((io.bgCNT[x] & 0x3) == i)
+            {
+                drawBGMode0(x);
+            }
+        }
+    }
+    //drawBGMode0(0xFF);
+    //drawBGMode0(3);
+    //drawBGMode0(2);
+    //drawBGMode0(1);
+    //drawBGMode0(0);
     drawSprites();
     //printf("BG: 0x%X\n", io.bgXScroll[2] / 8);
     //printf("Successful Exit\n");
@@ -557,6 +935,32 @@ void gbaDisplay::drawScreenMode4()
                                ((((color >> 10) & 0x1F) << 3) << 16) |
                                ((((color >> 5) & 0x1F) << 3) << 8) |
                                (((color & 0x1F) << 3));
+        }
+    }
+}
+
+void gbaDisplay::drawScreenMode3()
+{
+    for(int y = 0; y < 160; y++)
+    {
+        for(int x = 0; x < 240; x++)
+        {
+            /*
+                Get screen color of current pixel
+                Decode screen color
+                Write it
+            */
+
+            uint32_t location = 0x06000000 + (x * 2) + (y * 480);
+
+            uint8_t colorLocate = io.readMem(location, 1);
+
+            //location = 0x05000000 + (colorLocate * 2);
+            uint16_t color = colorLocate;
+            screenArray[y][x] = (0xFF << 24) |
+                               ((((color & 0x1F)) << 3) << 16) |
+                               ((((color >> 5) & 0x1F) << 3) << 8) |
+                               ((((color >> 10) & 0x1F) << 3));
         }
     }
 }

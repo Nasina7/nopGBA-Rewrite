@@ -6,7 +6,7 @@ class gbaAudio
         SDL_AudioSpec want, have;
         SDL_AudioDeviceID dev;
 
-        Uint8 samples[128];
+        Uint8 samples[32];
         float frameSamples[4096];
 
         bool inAudioCallback;

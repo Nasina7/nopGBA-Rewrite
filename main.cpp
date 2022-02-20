@@ -4,6 +4,9 @@
 #include "ui.hpp"
 #include "io.hpp"
 #include "input.hpp"
+#include "audio.hpp"
+#include "display.hpp"
+#include <thread>
 
 using namespace std;
 
@@ -14,6 +17,10 @@ uint64_t secondsPassed2 = 0;
 int main()
 {
 
+    //FILE* megalo = fopen("mega.raw", "rb");
+    //fread(audio.megalovaniaTest, sizeof(uint8_t), sizeof(audio.megalovaniaTest), megalo);
+    //fclose(megalo);
+    ram.openBusEnable = true;
     /*
     bool readMemBench = false;
     uint32_t readMemLoc = 0;
@@ -57,15 +64,19 @@ int main()
     */
     cpu.generateThumbLookup();
     cpu.opcodesRan = 0;
-    ui.initUI();
+    //ui.initUI();
     ui.startEmulation = false;
-    while(ui.startEmulation == false)
+    std::thread uiThread (&gbaUI::handleUI, gbaUI());
+    while(cpu.R[15] != 0x08000000)
     {
-        ui.handleUI();
-        input.handleInput();
+        SDL_Delay(1);
+        //ui.handleUI();
+        //input.handleInput();
+        ui.pauseEmulation = false;
+        ui.runNoStep = true;
+        //printf("cpu: 0x%X\n", cpu.R[15]);
     }
 
-    //printf("TEST: 0x%X\n", io.readMem(0x080000C0, 2));
     //return 0;
     //cpu.doOpcode();
     //printf("0x%X\n",cpu.R[15]);
@@ -74,14 +85,27 @@ int main()
     io.KEYINPUT = 0xFFFF;
     //ui.pauseEmulation = true;
     //ui.runNoStep = false;
-    ui.pauseEmulation = true;
     while(!ui.endEmulator) // Main EMU Loop
     {
+        //io.writeMem(0x030022DC, 0, 1);
         cpu.doOpcode();//080010cc
+
+        ram.save[0] = 0x62;
+        ram.save[1] = 0x13;
+        if(ui.disableTimers == false)
+        {
+            cpu.handleTimers();
+        }
+        //
+        //cpu.handleDMA();
         while(ui.pauseEmulation == true)
         {
-            ui.handleUI();
-            input.handleInput();
+            SDL_Delay(1);
+            if(ui.endEmulator)
+            {
+                uiThread.join();
+            }
+            SDL_Delay(1);
         }
         switch(cpu.cpsr.T)
         {
@@ -108,15 +132,45 @@ int main()
                 cpu.R[15] = cpu.R[15] & 0xFFFFFFFE;
             break;
         }
-        if(cpu.opcodesRan % opPerFrame == 0)
+        if(cpu.opcodesRan % (opPerFrame / 228) == 0)
         {
-            SDL_PauseAudio(0);
-            if(((io.dispStat) & 0x8) != 0)
+            //screen.drawScreenScanline();
+            io.VCOUNT++;
+            io.IF |= 0x2;
+            if(io.VCOUNT == 160)
             {
-                io.IF = io.IF | 0x1;
+                //io.dispStat |= 0x1;
+                //if(((io.dispStat) & 0x8) != 0)
+                //{
+                    io.IF = io.IF | 0x1;
+                //}
             }
-            ui.handleUI();
-            input.handleInput();
+            if(io.VCOUNT == (io.dispStat >> 8))
+            {
+                //io.dispStat |= 0x4;
+                if(((io.dispStat) & 0x20) != 0)
+                {
+                    io.IF = io.IF | 0x4;
+                }
+            }
+        }
+        if(io.VCOUNT == 228)
+        {
+            io.VCOUNT = 0;
+            io.dispStat &= 0xFFF8;
+            if(io.VCOUNT == (io.dispStat >> 8))
+            {
+                //io.dispStat |= 0x4;
+                if(((io.dispStat) & 0x20) != 0)
+                {
+                    io.IF = io.IF | 0x4;
+                }
+            }
+            ui.framesPerSecondEMU++;
+
+            SDL_PauseAudio(0);
+            //ui.handleUI();
+            //input.handleInput();
         }
         if(ui.runNoStep == false)
         {
@@ -134,7 +188,13 @@ int main()
                 ui.useRunTo = false;
             }
         }
+        if((cpu.R[1]) == 0x06000421)
+        {
+            //ui.pauseEmulation = true;
+            //ui.useRunTo = false;
+        }
         //printf("CPSR: \nN: 0x%X\nZ: 0x%X\nC: 0x%X\n",cpu.cpsr.N,cpu.cpsr.Z,cpu.cpsr.C);
         //printf("R15: 0x%X\n",cpu.R[15]);
     }
+    uiThread.join();
 }
