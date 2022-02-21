@@ -33,11 +33,8 @@
 				<Compiler>
 					<Add option="-fexpensive-optimizations" />
 					<Add option="-O3" />
-					<Add option="-pg" />
-					<Add option="-g" />
 				</Compiler>
 				<Linker>
-					<Add option="-pg" />
 					<Add option="-lSDL2" />
 					<Add option="-lGLU" />
 					<Add option="-lGL" />

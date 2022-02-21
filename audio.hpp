@@ -12,7 +12,6 @@ class gbaAudio
         bool inAudioCallback;
 
         int megaloTestCount;
-        uint8_t megalovaniaTest[0x4e0aa0];
 
 
         int frameSampleCount;

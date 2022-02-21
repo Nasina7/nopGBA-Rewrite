@@ -8,7 +8,7 @@ void gbaCPU::decodeAndRunTHUMB()
     //uint16_t opcode = io.readMem(cpu.R[15], 1);
     //cpu.lastOpcodeRan = io.readMem(cpu.R[15], 1);
     //printf("Opcode: 0x%X\n",opcode);
-    cpu.runTHUMB(io.readMem(cpu.R[15], 1));
+    runTHUMB(io.readMem(cpu.R[15], 1));
 }
 typedef void (gbaCPU::*thumbLookup2)(short unsigned int);
 
@@ -422,6 +422,7 @@ void gbaCPU::generateThumbLookup()
     {
         thumbLookupTable[i] = getThumbOpcode(i);
     }
+    //(cpu.*thumbLookupTable[0x5E32])(0x5E32);
 }
 
 void gbaCPU::runTHUMB(uint16_t opcode)
@@ -842,10 +843,10 @@ void gbaCPU::runTHUMB(uint16_t opcode)
 // BEGINNING OF THUMB OPCODES
 void gbaCPU::T_STMIA(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rn = ((opcode >> 8) & 0x7);
     uint8_t regList = (opcode & 0xFF);
-    uint32_t startAddress = cpu.R[Rn];
+    uint32_t startAddress = R[Rn];
     uint8_t setBits = 0;
     bool setBitArray[8];
     for(int i = 0; i < 8; i++)
@@ -861,19 +862,41 @@ void gbaCPU::T_STMIA(uint16_t opcode)
     {
         if(setBitArray[i] == true)
         {
-            io.writeMem(startAddress, 2, cpu.R[i]);
-            startAddress += 4;
+            if(i == Rn)
+            {
+                if(R[Rn] != startAddress) // Thumb.gba test 230
+                {
+                    io.writeMem(startAddress, 2, R[i] + (setBits * 4));
+                    startAddress += 4;
+                }
+                else // Thumb.gba test 232
+                {
+                    io.writeMem(startAddress, 2, R[i]);
+                    startAddress += 4;
+                }
+            }
+            else
+            {
+                io.writeMem(startAddress, 2, R[i]);
+                startAddress += 4;
+            }
+
         }
     }
-    cpu.R[Rn] = cpu.R[Rn] + (setBits * 4);
+    if(setBits == 0) // Thumb.gba test 229
+    {
+        io.writeMem(startAddress, 2, R[15] + 4);
+        setBits = 0x10;
+    }
+    R[Rn] = R[Rn] + (setBits * 4);
 }
 
 void gbaCPU::T_LDMIA(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rn = ((opcode >> 8) & 0x7);
     uint8_t regList = (opcode & 0xFF);
-    uint32_t startAddress = cpu.R[Rn];
+    uint32_t startAddress = R[Rn];
     uint8_t setBits = 0;
     bool setBitArray[8];
     for(int i = 0; i < 8; i++)
@@ -889,105 +912,110 @@ void gbaCPU::T_LDMIA(uint16_t opcode)
     {
         if(setBitArray[i] == true)
         {
-            cpu.R[i] = io.readMem(startAddress, 2); // Is this correct?
+            R[i] = io.readMem(startAddress, 2); // Is this correct?
             startAddress += 4;
         }
     }
-    cpu.R[Rn] = cpu.R[Rn] + (setBits * 4);
+    if(setBits == 0) // Thumb.gba test 227
+    {
+        R[15] = io.readMem(startAddress, 2);
+        setBits = 0x10;
+    }
+    R[Rn] = R[Rn] + (setBits * 4);
 }
 
 void gbaCPU::T_LD_LP(uint16_t opcode)
 {
-    cpu.R[15] += 2;
-    cpu.R[15] += 2;
-    uint32_t location = cpu.R[15] & 0xFFFFFFFC;
+    R[15] += 2;
+    R[15] += 2;
+    uint32_t location = R[15] & 0xFFFFFFFC;
     location += ((opcode & 0x00FF) * 4);
     uint8_t Rd = ((opcode >> 8) & 0x7);
-    cpu.R[15] -= 2;
-    cpu.R[Rd] = io.readMem(location, 2);
+    R[15] -= 2;
+    R[Rd] = io.readMem(location, 2);
 }
 
 void gbaCPU::T_LSL_IMD(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint8_t shiftVal = ((opcode >> 6) & 0x1F);
 
     if(shiftVal == 0)
     {
-        cpu.R[Rd] = cpu.R[Rm];
+        R[Rd] = R[Rm];
     }
     if(shiftVal != 0)
     {
-        cpu.cpsr.C = ( ( ( cpu.R[Rm] >> (32 - shiftVal) ) & 0x1 ) != 0); // != 0 might be unneeded
-        cpu.R[Rd] = (cpu.R[Rm] << shiftVal);
+        cpsr.C = ( ( ( R[Rm] >> (32 - shiftVal) ) & 0x1 ) != 0); // != 0 might be unneeded
+        R[Rd] = (R[Rm] << shiftVal);
     }
-    cpu.cpsr.N = ((cpu.R[Rd] & 0x80000000) != 0);
-    cpu.cpsr.Z = (cpu.R[Rd] == 0);
+    cpsr.N = ((R[Rd] & 0x80000000) != 0);
+    cpsr.Z = (R[Rd] == 0);
 }
 
 void gbaCPU::T_LSR_IMD(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint8_t shiftVal = ((opcode >> 6) & 0x1F);
 
     if(shiftVal == 0)
     {
-        cpu.cpsr.C = ((cpu.R[Rm] & 0x80000000) != 0);
-        cpu.R[Rd] = 0;
+        cpsr.C = ((R[Rm] & 0x80000000) != 0);
+        R[Rd] = 0;
     }
     if(shiftVal != 0)
     {
-        cpu.cpsr.C = ( ( ( cpu.R[Rm] >> (shiftVal - 1) ) & 0x1 ) != 0); // != 0 might be unneeded
-        cpu.R[Rd] = (cpu.R[Rm] >> shiftVal);
+        cpsr.C = ( ( ( R[Rm] >> (shiftVal - 1) ) & 0x1 ) != 0); // != 0 might be unneeded
+        R[Rd] = (R[Rm] >> shiftVal);
     }
-    cpu.cpsr.N = ((cpu.R[Rd] & 0x80000000) != 0);
-    cpu.cpsr.Z = (cpu.R[Rd] == 0);
+    cpsr.N = ((R[Rd] & 0x80000000) != 0);
+    cpsr.Z = (R[Rd] == 0);
 }
 
 void gbaCPU::T_ASR_IMD(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint8_t shiftVal = ((opcode >> 6) & 0x1F);
 
     if(shiftVal == 0)
     {
-        cpu.cpsr.C = ((cpu.R[Rd] & 0x80000000) != 0);
-        if(cpu.cpsr.C == 0)
+        cpsr.C = ((R[Rd] & 0x80000000) != 0);
+        if(cpsr.C == 0)
         {
-            cpu.R[Rd] = 0;
+            R[Rd] = 0;
         }
-        if(cpu.cpsr.C == 1)
+        if(cpsr.C == 1)
         {
-            cpu.R[Rd] = 0xFFFFFFFF;
+            R[Rd] = 0xFFFFFFFF;
         }
     }
     if(shiftVal != 0)
     {
-        cpu.cpsr.C = ( ( ( cpu.R[Rd] >> (shiftVal - 1) ) & 0x1 ) != 0); // != 0 might be unneeded
-        cpu.R[Rd] = ((int32_t)cpu.R[Rm] >> shiftVal);
+        cpsr.C = ( ( ( R[Rd] >> (shiftVal - 1) ) & 0x1 ) != 0); // != 0 might be unneeded
+        R[Rd] = ((int32_t)R[Rm] >> shiftVal);
     }
-    cpu.cpsr.N = ((cpu.R[Rd] & 0x80000000) != 0);
-    cpu.cpsr.Z = (cpu.R[Rd] == 0);
+    cpsr.N = ((R[Rd] & 0x80000000) != 0);
+    cpsr.Z = (R[Rd] == 0);
 }
 
 void gbaCPU::T_B_EQ(uint16_t opcode)
 {
-    if(cpu.cpsr.Z == 1)
+    if(cpsr.Z == 1)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 4;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 4;
     }
-    if(cpu.cpsr.Z == 0)
+    if(cpsr.Z == 0)
     {
-        cpu.R[15] += 2;
+        R[15] += 2;
     }
 }
 void gbaCPU::T_B(uint16_t opcode)
@@ -996,356 +1024,358 @@ void gbaCPU::T_B(uint16_t opcode)
     jumpVal = jumpVal << 1;
     jumpVal = jumpVal << 20;
     jumpVal = jumpVal >> 20;
-    cpu.R[15] += jumpVal;
-    cpu.R[15] += 4;
+    R[15] += jumpVal;
+    R[15] += 4;
 
 }
 void gbaCPU::T_B_NE(uint16_t opcode)
 {
-    if(cpu.cpsr.Z == 0)
+    if(cpsr.Z == 0)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 4;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 4;
     }
-    if(cpu.cpsr.Z == 1)
+    if(cpsr.Z == 1)
     {
-        cpu.R[15] += 2;
+        R[15] += 2;
     }
 }
 void gbaCPU::T_B_CS(uint16_t opcode)
 {
-    if(cpu.cpsr.C == 1)
+    if(cpsr.C == 1)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 4;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 4;
     }
-    if(cpu.cpsr.C == 0)
+    if(cpsr.C == 0)
     {
-        cpu.R[15] += 2;
+        R[15] += 2;
     }
 }
 void gbaCPU::T_B_CC(uint16_t opcode)
 {
-    if(cpu.cpsr.C == 0)
+    if(cpsr.C == 0)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 4;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 4;
     }
-    if(cpu.cpsr.C == 1)
+    if(cpsr.C == 1)
     {
-        cpu.R[15] += 2;
+        R[15] += 2;
     }
 }
 void gbaCPU::T_B_MI(uint16_t opcode)
 {
-    if(cpu.cpsr.N == 1)
+    if(cpsr.N == 1)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 4;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 4;
     }
-    if(cpu.cpsr.N == 0)
+    if(cpsr.N == 0)
     {
-        cpu.R[15] += 2;
+        R[15] += 2;
     }
 }
 void gbaCPU::T_B_PL(uint16_t opcode)
 {
-    if(cpu.cpsr.N == 0)
+    if(cpsr.N == 0)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 4;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 4;
     }
-    if(cpu.cpsr.N == 1)
+    if(cpsr.N == 1)
     {
-        cpu.R[15] += 2;
+        R[15] += 2;
     }
 }
 void gbaCPU::T_B_VS(uint16_t opcode)
 {
-    if(cpu.cpsr.V == 1)
+    if(cpsr.V == 1)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 4;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 4;
     }
-    if(cpu.cpsr.V == 0)
+    if(cpsr.V == 0)
     {
-        cpu.R[15] += 2;
+        R[15] += 2;
     }
 }
 void gbaCPU::T_B_VC(uint16_t opcode)
 {
-    if(cpu.cpsr.V == 0)
+    if(cpsr.V == 0)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 4;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 4;
     }
-    if(cpu.cpsr.V == 1)
+    if(cpsr.V == 1)
     {
-        cpu.R[15] += 2;
+        R[15] += 2;
     }
 }
 void gbaCPU::T_B_HI(uint16_t opcode)
 {
-    if(cpu.cpsr.C == 1 && cpu.cpsr.Z == 0)
+    if(cpsr.C == 1 && cpsr.Z == 0)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 2;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 2;
     }
-    cpu.R[15] += 2;
+    R[15] += 2;
 }
 void gbaCPU::T_B_LS(uint16_t opcode)
 {
-    if(cpu.cpsr.C == 0 || cpu.cpsr.Z == 1)
+    if(cpsr.C == 0 || cpsr.Z == 1)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 2;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 2;
     }
-    cpu.R[15] += 2;
+    R[15] += 2;
 }
 void gbaCPU::T_B_GE(uint16_t opcode)
 {
-    if(cpu.cpsr.N == cpu.cpsr.V)
+    if(cpsr.N == cpsr.V)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 2;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 2;
     }
-    cpu.R[15] += 2;
+    R[15] += 2;
 }
 void gbaCPU::T_B_LT(uint16_t opcode)
 {
-    if(cpu.cpsr.N != cpu.cpsr.V)
+    if(cpsr.N != cpsr.V)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 2;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 2;
     }
-    cpu.R[15] += 2;
+    R[15] += 2;
 }
 void gbaCPU::T_B_GT(uint16_t opcode)
 {
-    if(cpu.cpsr.N == cpu.cpsr.V && cpu.cpsr.Z == 0)
+    if(cpsr.N == cpsr.V && cpsr.Z == 0)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 2;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 2;
     }
-    cpu.R[15] += 2;
+    R[15] += 2;
 }
 void gbaCPU::T_B_LE(uint16_t opcode)
 {
-    if(cpu.cpsr.N != cpu.cpsr.V || cpu.cpsr.Z == 1)
+    if(cpsr.N != cpsr.V || cpsr.Z == 1)
     {
         int8_t jumpVal = (opcode & 0xFF);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += (jumpVal);
-        cpu.R[15] += 2;
+        R[15] += (jumpVal);
+        R[15] += (jumpVal);
+        R[15] += 2;
     }
-    cpu.R[15] += 2;
+    R[15] += 2;
 }
 
 void gbaCPU::T_CMP_IMD(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rn = ((opcode >> 8) & 0x7);
     uint8_t imdVal = (opcode & 0xFF);
 
-    uint32_t result = cpu.R[Rn] - imdVal;
+    uint32_t result = R[Rn] - imdVal;
 
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = ((uint64_t)0xFFFFFFFF >= ((uint64_t)cpu.R[Rn] - (uint64_t)imdVal));
-    cpu.cpsr.V = (( (uint64_t)cpu.R[Rn] ^ (uint64_t)imdVal ) &
-                     ( ( (uint64_t)cpu.R[Rn] ^ result ) ) &
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    cpsr.C = ((uint64_t)0xFFFFFFFF >= ((uint64_t)R[Rn] - (uint64_t)imdVal));
+    cpsr.V = (( (uint64_t)R[Rn] ^ (uint64_t)imdVal ) &
+                     ( ( (uint64_t)R[Rn] ^ result ) ) &
                      0x80000000 ) != 0;
 }
 void gbaCPU::T_SUB_IMD(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rd = ((opcode >> 8) & 0x7);
     uint8_t imdVal = (opcode & 0xFF);
 
-    uint32_t result = cpu.R[Rd] - imdVal;
+    uint32_t result = R[Rd] - imdVal;
 
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = ((uint64_t)0xFFFFFFFF >= ((uint64_t)cpu.R[Rd] - (uint64_t)imdVal));
-    cpu.cpsr.V = (( (uint64_t)cpu.R[Rd] ^ (uint64_t)imdVal ) &
-                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    cpsr.C = ((uint64_t)0xFFFFFFFF >= ((uint64_t)R[Rd] - (uint64_t)imdVal));
+    cpsr.V = (( (uint64_t)R[Rd] ^ (uint64_t)imdVal ) &
+                     ( ( (uint64_t)R[Rd] ^ result ) ) &
                      0x80000000 ) != 0;
-    cpu.R[Rd] = result;
+    R[Rd] = result;
     // MISSING V IMPLEMENTATION, SEE PG. 339
 }
 void gbaCPU::T_ADD_IMD(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rd = ((opcode >> 8) & 0x7);
     uint8_t imdVal = (opcode & 0xFF);
 
-    uint32_t result = cpu.R[Rd] + imdVal;
+    uint32_t result = R[Rd] + imdVal;
 
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = ((uint64_t)0xFFFFFFFF < ((uint64_t)cpu.R[Rd] + (uint64_t)imdVal));
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    cpsr.C = ((uint64_t)0xFFFFFFFF < ((uint64_t)R[Rd] + (uint64_t)imdVal));
 
-    cpu.cpsr.V = ( ~ ( (uint64_t)cpu.R[Rd] ^ (uint64_t)imdVal ) &
-                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+    cpsr.V = ( ~ ( (uint64_t)R[Rd] ^ (uint64_t)imdVal ) &
+                     ( ( (uint64_t)R[Rd] ^ result ) ) &
                      0x80000000 ) != 0;
 
-    cpu.R[Rd] = result;
+    R[Rd] = result;
     // MISSING V IMPLEMENTATION, SEE PG. 339
 }
 
 void gbaCPU::T_ADD_PC(uint16_t opcode)
 {
     //ui.pauseEmulation = true;
-    cpu.R[15] += 2;
-    cpu.R[15] += 2;
+    R[15] += 2;
+    R[15] += 2;
     uint8_t Rd = ((opcode >> 8) & 0x7);
     uint8_t imdVal = (opcode & 0xFF);
+    //printf("ImdVal: 0x%X\n", imdVal);
+    //printf("The pC: 0x%X\n", R[15]);
 
-    cpu.R[Rd] = (cpu.R[15] + (imdVal << 2)) - 2;
-    cpu.R[15] -= 2;
+    R[Rd] = ((R[15] & 0xFFFFFFFC) + (imdVal << 2));
+    R[15] -= 2;
 }
 void gbaCPU::T_ADD_SP(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rd = ((opcode >> 8) & 0x7);
     uint8_t imdVal = (opcode & 0xFF);
 
-    cpu.R[Rd] = cpu.R[13] + (imdVal << 2);
+    R[Rd] = R[13] + (imdVal << 2);
 }
 void gbaCPU::T_ADD_SIMD(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t Rn = ((opcode >> 3) & 0x7);
     uint8_t imdVal = ((opcode >> 6) & 0x7);
 
 
-    uint32_t result = cpu.R[Rn] + imdVal;
+    uint32_t result = R[Rn] + imdVal;
 
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF < ((uint64_t)cpu.R[Rn] + (uint64_t)imdVal));
-    cpu.cpsr.V = ( ~ ( (uint64_t)cpu.R[Rd] ^ (uint64_t)imdVal ) &
-                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    cpsr.C = (0xFFFFFFFF < ((uint64_t)R[Rn] + (uint64_t)imdVal));
+    cpsr.V = ( ~ ( (uint64_t)R[Rd] ^ (uint64_t)imdVal ) &
+                     ( ( (uint64_t)R[Rd] ^ result ) ) &
                      0x80000000 ) != 0;
-    cpu.R[Rd] = result;
+    R[Rd] = result;
     // MISSING V IMPLEMENTATION, SEE PG. 309
 }
 void gbaCPU::T_SUB_SIMD(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t Rn = ((opcode >> 3) & 0x7);
     uint8_t imdVal = ((opcode >> 6) & 0x7);
 
 
-    uint32_t result = cpu.R[Rn] - imdVal;
+    uint32_t result = R[Rn] - imdVal;
 
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF >= ((uint64_t)cpu.R[Rn] - (uint64_t)imdVal));
-    cpu.cpsr.V = (( (uint64_t)cpu.R[Rd] ^ (uint64_t)imdVal ) &
-                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    cpsr.C = (0xFFFFFFFF >= ((uint64_t)R[Rn] - (uint64_t)imdVal));
+    cpsr.V = (( (uint64_t)R[Rd] ^ (uint64_t)imdVal ) &
+                     ( ( (uint64_t)R[Rd] ^ result ) ) &
                      0x80000000 ) != 0;
-    cpu.R[Rd] = result;
+    R[Rd] = result;
     // MISSING V IMPLEMENTATION, SEE PG. 309
 }
 void gbaCPU::T_ADD_REG(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t Rn = ((opcode >> 3) & 0x7);
     uint8_t Rm = ((opcode >> 6) & 0x7);
 
-    uint32_t result = cpu.R[Rn] + cpu.R[Rm];
+    uint32_t result = R[Rn] + R[Rm];
 
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF < ((uint64_t)cpu.R[Rn] + (uint64_t)cpu.R[Rm]));
-    cpu.cpsr.V = ( ~ ( (uint64_t)cpu.R[Rd] ^ (uint64_t)cpu.R[Rm] ) &
-                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    cpsr.C = (0xFFFFFFFF < ((uint64_t)R[Rn] + (uint64_t)R[Rm]));
+    cpsr.V = ( ~ ( (uint64_t)R[Rd] ^ (uint64_t)R[Rm] ) &
+                     ( ( (uint64_t)R[Rd] ^ result ) ) &
                      0x80000000 ) != 0;
 
-    cpu.R[Rd] = result;
+    R[Rd] = result;
     // MISSING V IMPLEMENTATION, SEE PG. 339
 }
 void gbaCPU::T_SUB_REG(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t Rn = ((opcode >> 3) & 0x7);
     uint8_t Rm = ((opcode >> 6) & 0x7);
 
-    uint32_t result = cpu.R[Rn] - cpu.R[Rm];
+    uint32_t result = R[Rn] - R[Rm];
 
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF >= ((uint64_t)cpu.R[Rn] - (uint64_t)cpu.R[Rm]));
-    cpu.cpsr.V = (( (uint64_t)cpu.R[Rd] ^ (uint64_t)cpu.R[Rm] ) &
-                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    cpsr.C = (0xFFFFFFFF >= ((uint64_t)R[Rn] - (uint64_t)R[Rm]));
+    cpsr.V = (( (uint64_t)R[Rd] ^ (uint64_t)R[Rm] ) &
+                     ( ( (uint64_t)R[Rd] ^ result ) ) &
                      0x80000000 ) != 0;
-    cpu.R[Rd] = result;
+    R[Rd] = result;
     // MISSING V IMPLEMENTATION, SEE PG. 339
 }
 void gbaCPU::T_MOV_IMD(uint16_t opcode)
 {
-    cpu.R[15] += 2;
+    R[15] += 2;
     uint8_t Rd = ((opcode >> 8) & 0x7);
     uint8_t imdVal = (opcode & 0xFF);
 
     uint32_t result = imdVal;
 
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.R[Rd] = result;
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    R[Rd] = result;
     // MISSING V IMPLEMENTATION, SEE PG. 339
 }
 
 void gbaCPU::T_BL(uint16_t opcode)
 {
-    cpu.R[14] = (cpu.R[15] + 4) | cpu.cpsr.T;
-    uint32_t fullOpcode = (io.readMem(cpu.R[15],1) << 16) | io.readMem(cpu.R[15] + 2,1);
+    R[14] = (R[15] + 4) | cpsr.T;
+    uint32_t fullOpcode = (io.readMem(R[15],1) << 16) | io.readMem(R[15] + 2,1);
     int32_t offset = opcode & 0x7FF;
     offset = offset << 12;
     offset = offset << 9; // Sign Extend
     offset = offset >> 9;
-    cpu.R[15] += offset;
+    R[15] += offset;
     uint32_t offset2 = fullOpcode & 0x7FF;
-    cpu.R[15] += offset2;
-    cpu.R[15] += offset2;
-    cpu.R[15] += 4;
+    R[15] += offset2;
+    R[15] += offset2;
+    R[15] += 4;
 }
 
 void gbaCPU::T_BX(uint16_t opcode)
@@ -1354,20 +1384,20 @@ void gbaCPU::T_BX(uint16_t opcode)
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint8_t highReg = ((opcode >> 6) & 0x1);
     Rm = Rm + (highReg * 8);
-    //printf("Loaded Location: 0x%X\n", cpu.R[Rm]);
-    cpu.cpsr.T = (cpu.R[Rm] & 0x1);
-    //printf("Chosen Thumb Mode: 0x%X\n", cpu.cpsr.T);
-    cpu.R[15] = (cpu.R[Rm] & 0xFFFFFFFE);
-    //printf("Jumped To 0x%X\n", cpu.R[15]);
+    //printf("Loaded Location: 0x%X\n", R[Rm]);
+    cpsr.T = (R[Rm] & 0x1);
+    //printf("Chosen Thumb Mode: 0x%X\n", cpsr.T);
+    R[15] = (R[Rm] & 0xFFFFFFFE);
+    //printf("Jumped To 0x%X\n", R[15]);
     if(Rm == 15)
     {
-        if(cpu.cpsr.T == 1)
+        if(cpsr.T == 1)
         {
-            cpu.R[15] += 2;
+            R[15] += 2;
         }
         else
         {
-            cpu.R[15] += 4;
+            R[15] += 4;
         }
     }
 }
@@ -1376,91 +1406,91 @@ void gbaCPU::T_AND_ALU(uint16_t opcode)
 {
     uint8_t Rd = (opcode & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
-    uint32_t result = cpu.R[Rd] & cpu.R[Rm];
+    uint32_t result = R[Rd] & R[Rm];
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
 
-    cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    R[Rd] = result;
+    R[15] += 2;
 }
 
 void gbaCPU::T_BIC_ALU(uint16_t opcode)
 {
     uint8_t Rd = (opcode & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
-    uint32_t result = cpu.R[Rd] & (~cpu.R[Rm]);
+    uint32_t result = R[Rd] & (~R[Rm]);
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
 
-    cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    R[Rd] = result;
+    R[15] += 2;
 }
 
 void gbaCPU::T_MVN_ALU(uint16_t opcode)
 {
     uint8_t Rd = (opcode & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
-    uint32_t result = (~cpu.R[Rm]);
+    uint32_t result = (~R[Rm]);
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
 
-    cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    R[Rd] = result;
+    R[15] += 2;
 }
 
 void gbaCPU::T_ORR_ALU(uint16_t opcode)
 {
     uint8_t Rd = (opcode & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
-    uint32_t result = cpu.R[Rd] | cpu.R[Rm];
+    uint32_t result = R[Rd] | R[Rm];
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
 
-    cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    R[Rd] = result;
+    R[15] += 2;
 }
 
 void gbaCPU::T_MUL_ALU(uint16_t opcode)
 {
     uint8_t Rd = (opcode & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
-    uint32_t result = cpu.R[Rd] * cpu.R[Rm];
+    uint32_t result = R[Rd] * R[Rm];
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
 
-    cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    R[Rd] = result;
+    R[15] += 2;
 }
 
 void gbaCPU::T_TST_ALU(uint16_t opcode)
 {
     uint8_t Rd = (opcode & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
-    uint32_t result = cpu.R[Rd] & cpu.R[Rm];
+    uint32_t result = R[Rd] & R[Rm];
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
 
-    //cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    //R[Rd] = result;
+    R[15] += 2;
 }
 
 void gbaCPU::T_EOR_ALU(uint16_t opcode)
 {
     uint8_t Rd = (opcode & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
-    uint32_t result = cpu.R[Rd] ^ cpu.R[Rm];
+    uint32_t result = R[Rd] ^ R[Rm];
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
 
-    cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    R[Rd] = result;
+    R[15] += 2;
 }
 
 
@@ -1470,31 +1500,31 @@ void gbaCPU::T_LSL_ALU(uint16_t opcode)
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint32_t result = 0;
 
-    if((cpu.R[Rm] & 0xFF) == 0)
+    if((R[Rm] & 0xFF) == 0)
     {
-        result = cpu.R[Rd];
+        result = R[Rd];
     }
-    if((cpu.R[Rm] & 0xFF) < 32 && (cpu.R[Rm] & 0xFF) != 0)
+    if((R[Rm] & 0xFF) < 32 && (R[Rm] & 0xFF) != 0)
     {
-        cpu.cpsr.C =  ( ( ( cpu.R[Rd] >> ( 32 - ( cpu.R[Rm] & 0xFF ) ) ) & 0x1 ) != 0); // != 0 Might be unneeded
-        result = cpu.R[Rd] << (cpu.R[Rm] & 0xFF);
+        cpsr.C =  ( ( ( R[Rd] >> ( 32 - ( R[Rm] & 0xFF ) ) ) & 0x1 ) != 0); // != 0 Might be unneeded
+        result = R[Rd] << (R[Rm] & 0xFF);
     }
-    if((cpu.R[Rm] & 0xFF) == 32)
+    if((R[Rm] & 0xFF) == 32)
     {
-        cpu.cpsr.C = (cpu.R[Rd] & 0x1);
+        cpsr.C = (R[Rd] & 0x1);
         result = 0;
     }
-    if((cpu.R[Rm] & 0xFF) > 32)
+    if((R[Rm] & 0xFF) > 32)
     {
-        cpu.cpsr.C = 0;
+        cpsr.C = 0;
         result = 0;
     }
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
 
-    cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    R[Rd] = result;
+    R[15] += 2;
 }
 
 void gbaCPU::T_LSR_ALU(uint16_t opcode)
@@ -1503,31 +1533,31 @@ void gbaCPU::T_LSR_ALU(uint16_t opcode)
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint32_t result = 0;
 
-    if((cpu.R[Rm] & 0xFF) == 0)
+    if((R[Rm] & 0xFF) == 0)
     {
-        result = cpu.R[Rd];
+        result = R[Rd];
     }
-    if((cpu.R[Rm] & 0xFF) < 32 && (cpu.R[Rm] & 0xFF) != 0)
+    if((R[Rm] & 0xFF) < 32 && (R[Rm] & 0xFF) != 0)
     {
-        cpu.cpsr.C =  ( ( ( cpu.R[Rd] >> ( cpu.R[Rm] - 1) ) & 0x1 ) != 0); // != 0 Might be unneeded
-        result = cpu.R[Rd] >> (cpu.R[Rm] & 0xFF);
+        cpsr.C =  ( ( ( R[Rd] >> ( R[Rm] - 1) ) & 0x1 ) != 0); // != 0 Might be unneeded
+        result = R[Rd] >> (R[Rm] & 0xFF);
     }
-    if((cpu.R[Rm] & 0xFF) == 32)
+    if((R[Rm] & 0xFF) == 32)
     {
-        cpu.cpsr.C = ((cpu.R[Rd] & 0x80000000) != 0);
+        cpsr.C = ((R[Rd] & 0x80000000) != 0);
         result = 0;
     }
-    if((cpu.R[Rm] & 0xFF) > 32)
+    if((R[Rm] & 0xFF) > 32)
     {
-        cpu.cpsr.C = 0;
+        cpsr.C = 0;
         result = 0;
     }
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
 
-    cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    R[Rd] = result;
+    R[15] += 2;
 }
 
 void gbaCPU::T_ASR_ALU(uint16_t opcode)
@@ -1536,33 +1566,33 @@ void gbaCPU::T_ASR_ALU(uint16_t opcode)
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint32_t result;
 
-    if((cpu.R[Rm] & 0xFF) == 0)
+    if((R[Rm] & 0xFF) == 0)
     {
-        result = cpu.R[Rd];
+        result = R[Rd];
     }
-    if((cpu.R[Rm] & 0xFF) < 32 && (cpu.R[Rm] & 0xFF) != 0)
+    if((R[Rm] & 0xFF) < 32 && (R[Rm] & 0xFF) != 0)
     {
-        cpu.cpsr.C =  ( ( ( cpu.R[Rd] >> ( cpu.R[Rm] - 1) ) & 0x1 ) != 0); // != 0 Might be unneeded
-        result = (int32_t)cpu.R[Rd] >> (cpu.R[Rm] & 0xFF);
+        cpsr.C =  ( ( ( R[Rd] >> ( R[Rm] - 1) ) & 0x1 ) != 0); // != 0 Might be unneeded
+        result = (int32_t)R[Rd] >> (R[Rm] & 0xFF);
     }
-    if((cpu.R[Rm] & 0xFF) >= 32)
+    if((R[Rm] & 0xFF) >= 32)
     {
-        cpu.cpsr.C = ((cpu.R[Rd] & 0x80000000) != 0);
-        if((cpu.R[Rd] & 0x80000000) != 0)
+        cpsr.C = ((R[Rd] & 0x80000000) != 0);
+        if((R[Rd] & 0x80000000) != 0)
         {
             result = 0xFFFFFFFF;
         }
-        if((cpu.R[Rd] & 0x80000000) == 0)
+        if((R[Rd] & 0x80000000) == 0)
         {
             result = 0;
         }
     }
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
 
-    cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    R[Rd] = result;
+    R[15] += 2;
 }
 
 
@@ -1572,17 +1602,17 @@ void gbaCPU::T_ADC_ALU(uint16_t opcode)
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint32_t result;
 
-    result = cpu.R[Rd] + cpu.R[Rm] + cpu.cpsr.C;
+    result = R[Rd] + R[Rm] + cpsr.C;
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF < ((uint64_t)cpu.R[Rd] + (uint64_t)cpu.R[Rm] + (uint64_t)cpu.cpsr.C));
-    cpu.cpsr.V = ( ~ ( (uint64_t)cpu.R[Rd] ^ ( (uint64_t)cpu.R[Rm] + (uint64_t)cpu.cpsr.C ) ) &
-                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    cpsr.C = (0xFFFFFFFF < ((uint64_t)R[Rd] + (uint64_t)R[Rm] + (uint64_t)cpsr.C));
+    cpsr.V = ( ~ ( (uint64_t)R[Rd] ^ ( (uint64_t)R[Rm] + (uint64_t)cpsr.C ) ) &
+                     ( ( (uint64_t)R[Rd] ^ result ) ) &
                      0x80000000 ) != 0;
 
-    cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    R[Rd] = result;
+    R[15] += 2;
 }
 
 void gbaCPU::T_SBC_ALU(uint16_t opcode)
@@ -1591,17 +1621,17 @@ void gbaCPU::T_SBC_ALU(uint16_t opcode)
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint32_t result;
 
-    result = cpu.R[Rd] - cpu.R[Rm] - (!cpu.cpsr.C);
+    result = R[Rd] - R[Rm] - (!cpsr.C);
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF >= ((uint64_t)cpu.R[Rd] - (uint64_t)cpu.R[Rm] - (uint64_t)(!cpu.cpsr.C)));
-    cpu.cpsr.V = ( ( (uint64_t)cpu.R[Rd] ^ ( (uint64_t)cpu.R[Rm] + (uint64_t)(!cpu.cpsr.C) ) ) &
-                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    cpsr.C = (0xFFFFFFFF >= ((uint64_t)R[Rd] - (uint64_t)R[Rm] - (uint64_t)(!cpsr.C)));
+    cpsr.V = ( ( (uint64_t)R[Rd] ^ ( (uint64_t)R[Rm] + (uint64_t)(!cpsr.C) ) ) &
+                     ( ( (uint64_t)R[Rd] ^ result ) ) &
                      0x80000000 ) != 0;
 
-    cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    R[Rd] = result;
+    R[15] += 2;
 }
 
 void gbaCPU::T_CMP_ALU(uint16_t opcode)
@@ -1610,17 +1640,17 @@ void gbaCPU::T_CMP_ALU(uint16_t opcode)
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint32_t result;
 
-    result = cpu.R[Rd] - cpu.R[Rm];
+    result = R[Rd] - R[Rm];
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = ((uint64_t)0xFFFFFFFF >= ((uint64_t)cpu.R[Rd] - (uint64_t)cpu.R[Rm]));
-    cpu.cpsr.V = (( (uint64_t)cpu.R[Rd] ^ (uint64_t)cpu.R[Rm] ) &
-                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    cpsr.C = ((uint64_t)0xFFFFFFFF >= ((uint64_t)R[Rd] - (uint64_t)R[Rm]));
+    cpsr.V = (( (uint64_t)R[Rd] ^ (uint64_t)R[Rm] ) &
+                     ( ( (uint64_t)R[Rd] ^ result ) ) &
                      0x80000000 ) != 0;
 
-    //cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    //R[Rd] = result;
+    R[15] += 2;
 }
 
 void gbaCPU::T_CMN_ALU(uint16_t opcode)
@@ -1629,17 +1659,17 @@ void gbaCPU::T_CMN_ALU(uint16_t opcode)
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint32_t result;
 
-    result = cpu.R[Rd] + cpu.R[Rm];
+    result = R[Rd] + R[Rm];
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = ((uint64_t)0xFFFFFFFF < ((uint64_t)cpu.R[Rd] + (uint64_t)cpu.R[Rm]));
-    cpu.cpsr.V = ( ~ ( (uint64_t)cpu.R[Rd] ^ (uint64_t)cpu.R[Rm] ) &
-                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    cpsr.C = ((uint64_t)0xFFFFFFFF < ((uint64_t)R[Rd] + (uint64_t)R[Rm]));
+    cpsr.V = ( ~ ( (uint64_t)R[Rd] ^ (uint64_t)R[Rm] ) &
+                     ( ( (uint64_t)R[Rd] ^ result ) ) &
                      0x80000000 ) != 0;
 
-    //cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    //R[Rd] = result;
+    R[15] += 2;
 }
 
 void gbaCPU::T_NEG_ALU(uint16_t opcode)
@@ -1648,15 +1678,15 @@ void gbaCPU::T_NEG_ALU(uint16_t opcode)
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint32_t result;
 
-    result = 0 - cpu.R[Rm];
+    result = 0 - R[Rm];
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = (0xFFFFFFFF >= ((uint64_t)0 - (uint64_t)cpu.R[Rm]));
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    cpsr.C = (0xFFFFFFFF >= ((uint64_t)0 - (uint64_t)R[Rm]));
     // MISSING V FLAG IMPLEMENTATION SEE PG. 377
 
-    cpu.R[Rd] = result;
-    cpu.R[15] += 2;
+    R[Rd] = result;
+    R[15] += 2;
 }
 
 void gbaCPU::T_ROR_ALU(uint16_t opcode)
@@ -1666,34 +1696,34 @@ void gbaCPU::T_ROR_ALU(uint16_t opcode)
     uint8_t Rm = ((opcode >> 3) & 0x7);
     //printf("RD: 0x%X\n", Rd);
     //printf("RM: 0x%X\n", Rm);
-    //printf("RDval: 0x%X\n", cpu.R[Rd]);
-    //printf("RMval: 0x%X\n", cpu.R[Rm]);
+    //printf("RDval: 0x%X\n", R[Rd]);
+    //printf("RMval: 0x%X\n", R[Rm]);
     uint32_t result;
 
-    if((cpu.R[Rm] & 0xFF) == 0)
+    if((R[Rm] & 0xFF) == 0)
     {
-        result = cpu.R[Rd];
+        result = R[Rd];
         //printf("PATH 1 CHOSEN\n");
     }
-    //if((cpu.R[Rm] & 0xF) == 0 && (cpu.R[Rm] & 0xFF) != 0)
+    //if((R[Rm] & 0xF) == 0 && (R[Rm] & 0xFF) != 0)
     //{
-    //    cpu.cpsr.C = ( ( cpu.R[Rd] & 0x80000000 ) != 0);
-    //    result = cpu.R[Rd];
+    //    cpsr.C = ( ( R[Rd] & 0x80000000 ) != 0);
+    //    result = R[Rd];
     //}
     else
     {
         //printf("PATH 2 CHOSEN\n");
-        cpu.cpsr.C = (((cpu.R[Rd] >> ((cpu.R[Rm] & 0x1F) - 1) ) & 0x1) != 0);
-        result = rotr32(cpu.R[Rd],(cpu.R[Rm] & 0x1F));
+        cpsr.C = (((R[Rd] >> ((R[Rm] & 0x1F) - 1) ) & 0x1) != 0);
+        result = rotr32(R[Rd],(R[Rm] & 0x1F));
     }
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    //cpu.cpsr.N = 1;
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    //cpsr.N = 1;
 
-    cpu.R[Rd] = result;
+    R[Rd] = result;
     //printf("RESULT: 0x%X\n", result);
-    cpu.R[15] += 2;
+    R[15] += 2;
 }
 
 
@@ -1704,10 +1734,10 @@ void gbaCPU::T_LDR_IMD(uint16_t opcode)
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t imdVal = ((opcode >> 6) & 0x1F);
 
-    uint32_t address = cpu.R[Rn] + (imdVal * 4);
+    uint32_t address = R[Rn] + (imdVal * 4);
     //address = address & 0xFFFFFFFC;
-    cpu.R[Rd] = io.readMem(address,2);
-    cpu.R[15] += 2;
+    R[Rd] = io.readMem(address,2);
+    R[15] += 2;
 }
 void gbaCPU::T_LDST_REG(uint16_t opcode)
 {
@@ -1718,26 +1748,26 @@ void gbaCPU::T_LDST_REG(uint16_t opcode)
     L = ((opcode >> 11) & 0x1);
     B = ((opcode >> 10) & 0x1);
 
-    uint32_t address = cpu.R[Rb] + cpu.R[Ro];
+    uint32_t address = R[Rb] + R[Ro];
     switch((L << 1) | B)
     {
         case 0: // Store Word
-            io.writeMem(address, 2, cpu.R[Rd]);
+            io.writeMem(address, 2, R[Rd]);
         break;
 
         case 1: // Store Byte
-            io.writeMem(address, 0, cpu.R[Rd]);
+            io.writeMem(address, 0, R[Rd]);
         break;
 
         case 2: // Load Word
-            cpu.R[Rd] = io.readMem(address,2);
+            R[Rd] = io.readMem(address,2);
         break;
 
         case 3: // Load Byte
-            cpu.R[Rd] = io.readMem(address,0);
+            R[Rd] = io.readMem(address,0);
         break;
     }
-    cpu.R[15] += 2;
+    R[15] += 2;
 }
 
 void gbaCPU::T_LDSTSBH_REG(uint16_t opcode)
@@ -1749,16 +1779,20 @@ void gbaCPU::T_LDSTSBH_REG(uint16_t opcode)
     H = ((opcode >> 11) & 0x1);
     S = ((opcode >> 10) & 0x1);
 
-    uint32_t address = cpu.R[Rb] + cpu.R[Ro];
+    uint32_t address = R[Rb] + R[Ro];
+    if((address & 0x1) == 1 && ((S << 1) | H) == 3) // thumb.gba edge case from test 212?
+    {
+        H = false;
+    }
     switch((S << 1) | H)
     {
         case 0:
-            io.writeMem(address, 1, cpu.R[Rd]);
+            io.writeMem(address, 1, R[Rd]);
         break;
 
         case 1:
-            cpu.R[Rd] = io.readMem(address,1);
-            //io.writeMem(address, 0, cpu.R[Rd]);
+            R[Rd] = io.readMem(address,1);
+            //io.writeMem(address, 0, R[Rd]);
         break;
 
         case 2:
@@ -1766,7 +1800,7 @@ void gbaCPU::T_LDSTSBH_REG(uint16_t opcode)
                 int32_t signExtend = io.readMem(address,0);
                 signExtend = signExtend << 24;
                 signExtend = signExtend >> 24;
-                cpu.R[Rd] = signExtend;
+                R[Rd] = signExtend;
             }
         break;
 
@@ -1775,11 +1809,11 @@ void gbaCPU::T_LDSTSBH_REG(uint16_t opcode)
                 int32_t signExtend = io.readMem(address,1);
                 signExtend = signExtend << 16;
                 signExtend = signExtend >> 16;
-                cpu.R[Rd] = signExtend;
+                R[Rd] = signExtend;
             }
         break;
     }
-    cpu.R[15] += 2;
+    R[15] += 2;
 }
 
 void gbaCPU::T_LDR_SP(uint16_t opcode)
@@ -1787,20 +1821,20 @@ void gbaCPU::T_LDR_SP(uint16_t opcode)
     uint8_t Rd = ((opcode >> 8) & 0x7);
     uint8_t imdVal = ((opcode) & 0xFF);
 
-    uint32_t address = cpu.R[13] + (imdVal * 4);
-    cpu.R[Rd] = io.readMem(address,2);
-    cpu.R[15] += 2;
+    uint32_t address = R[13] + (imdVal * 4);
+    R[Rd] = io.readMem(address,2);
+    R[15] += 2;
 }
 
 void gbaCPU::T_LDRH_IMD(uint16_t opcode)
 {
-    uint8_t Rn = ((opcode >> 3) & 0x7);
-    uint8_t Rd = ((opcode) & 0x7);
-    uint8_t imdVal = ((opcode >> 6) & 0x1F);
-//printf("0x%X\n", cpu.R[Rn] + (imdVal << 1));
-    //uint32_t address = cpu.R[Rn] + (imdVal * 2);
-    cpu.R[Rd] = io.readMem(cpu.R[Rn] + (imdVal << 1),1);
-    cpu.R[15] += 2;
+    register uint8_t Rn = ((opcode >> 3) & 0x7);
+    register uint8_t Rd = ((opcode) & 0x7);
+    register uint8_t imdVal = ((opcode >> 6) & 0x1F);
+//printf("0x%X\n", R[Rn] + (imdVal << 1));
+    //uint32_t address = R[Rn] + (imdVal * 2);
+    R[Rd] = io.readMem(R[Rn] + (imdVal << 1),1);
+    R[15] += 2;
 }
 void gbaCPU::T_LDRB_IMD(uint16_t opcode)
 {
@@ -1809,9 +1843,9 @@ void gbaCPU::T_LDRB_IMD(uint16_t opcode)
     uint8_t imdVal = ((opcode >> 6) & 0x1F);
     //printf("imdVAL: 0x%X\n", imdVal);
 
-    uint32_t address = cpu.R[Rn] + (imdVal);
-    cpu.R[Rd] = io.readMem(address,0);
-    cpu.R[15] += 2;
+    uint32_t address = R[Rn] + (imdVal);
+    R[Rd] = io.readMem(address,0);
+    R[15] += 2;
 }
 void gbaCPU::T_STR_IMD(uint16_t opcode)
 {
@@ -1819,9 +1853,9 @@ void gbaCPU::T_STR_IMD(uint16_t opcode)
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t imdVal = ((opcode >> 6) & 0x1F);
 
-    uint32_t address = cpu.R[Rn] + (imdVal * 4);
-    io.writeMem(address,2,cpu.R[Rd]);
-    cpu.R[15] += 2;
+    uint32_t address = R[Rn] + (imdVal * 4);
+    io.writeMem(address,2,R[Rd]);
+    R[15] += 2;
 }
 
 void gbaCPU::T_STR_SP(uint16_t opcode)
@@ -1829,13 +1863,13 @@ void gbaCPU::T_STR_SP(uint16_t opcode)
     uint8_t Rd = ((opcode >> 8) & 0x7);
     uint8_t imdVal = ((opcode) & 0xFF);
 
-    uint32_t address = cpu.R[13] + (imdVal * 4);
-    io.writeMem(address,2,cpu.R[Rd]);
+    uint32_t address = R[13] + (imdVal * 4);
+    io.writeMem(address,2,R[Rd]);
     if(Rd == 15)
     {
-        io.writeMem(address,2,cpu.R[Rd] - 8);
+        io.writeMem(address,2,R[Rd] - 8);
     }
-    cpu.R[15] += 2;
+    R[15] += 2;
 }
 
 void gbaCPU::T_STRH_IMD(uint16_t opcode)
@@ -1844,9 +1878,9 @@ void gbaCPU::T_STRH_IMD(uint16_t opcode)
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t imdVal = ((opcode >> 6) & 0x1F);
 
-    uint32_t address = cpu.R[Rn] + (imdVal * 2);
-    io.writeMem(address,1,cpu.R[Rd]);
-    cpu.R[15] += 2;
+    uint32_t address = R[Rn] + (imdVal * 2);
+    io.writeMem(address,1,R[Rd]);
+    R[15] += 2;
 }
 void gbaCPU::T_STRB_IMD(uint16_t opcode)
 {
@@ -1854,9 +1888,9 @@ void gbaCPU::T_STRB_IMD(uint16_t opcode)
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t imdVal = ((opcode >> 6) & 0x1F);
 
-    uint32_t address = cpu.R[Rn] + (imdVal);
-    io.writeMem(address,0,cpu.R[Rd]);
-    cpu.R[15] += 2;
+    uint32_t address = R[Rn] + (imdVal);
+    io.writeMem(address,0,R[Rd]);
+    R[15] += 2;
 }
 
 void gbaCPU::T_PUSH(uint16_t opcode)
@@ -1874,25 +1908,25 @@ void gbaCPU::T_PUSH(uint16_t opcode)
             setBitArray[i] = true;
         }
     }
-    uint32_t startAddress = (cpu.R[13] - 4 *(setBits));
-    //uint32_t endAddress = cpu.R[13] - 4;
+    uint32_t startAddress = (R[13] - 4 *(setBits));
+    //uint32_t endAddress = R[13] - 4;
 
 
     for(int i = 0; i < 9; i++)
     {
         if(setBitArray[i] == true && i != 8)
         {
-            io.writeMem(startAddress, 2, cpu.R[i]);
+            io.writeMem(startAddress, 2, R[i]);
             startAddress += 4;
         }
         if(setBitArray[i] == true && i == 8)
         {
-            io.writeMem(startAddress, 2, cpu.R[14]);
+            io.writeMem(startAddress, 2, R[14]);
             startAddress += 4;
         }
     }
-    cpu.R[13] = cpu.R[13] - 4*(setBits);
-    cpu.R[15] += 2;
+    R[13] = R[13] - 4*(setBits);
+    R[15] += 2;
 }
 
 void gbaCPU::T_POP(uint16_t opcode)
@@ -1910,26 +1944,26 @@ void gbaCPU::T_POP(uint16_t opcode)
             setBitArray[i] = true;
         }
     }
-    uint32_t startAddress = cpu.R[13];
-    uint32_t endAddress = cpu.R[13] + 4 * (setBits);
+    uint32_t startAddress = R[13];
+    uint32_t endAddress = R[13] + 4 * (setBits);
 
     for(int i = 0; i < 9; i++)
     {
         if(setBitArray[i] == true && i != 8)
         {
-            cpu.R[i] = io.readMem(startAddress, 2);
+            R[i] = io.readMem(startAddress, 2);
             startAddress += 4;
         }
         if(setBitArray[i] == true && i == 8)
         {
-            cpu.R[15] = io.readMem(startAddress, 2);
+            R[15] = io.readMem(startAddress, 2);
             startAddress += 4;
         }
     }
-    cpu.R[13] = endAddress;
+    R[13] = endAddress;
     if(setBitArray[8] == false)
     {
-        cpu.R[15] += 2;
+        R[15] += 2;
     }
 }
 
@@ -1941,18 +1975,18 @@ void gbaCPU::T_SDP_ADD(uint16_t opcode)
     uint8_t H1 = ((opcode >> 7) & 0x1);
     Rd = Rd + (H1 * 8);
     Rm = Rm + (H2 * 8);
-    cpu.R[Rd] = cpu.R[Rd] + cpu.R[Rm];
+    R[Rd] = R[Rd] + R[Rm];
     if(Rm == 0xF)
     {
-        cpu.R[Rd] += 4;
+        R[Rd] += 4;
     }
     if(Rd == 0xF)
     {
-        cpu.R[Rd] += 4;
+        R[Rd] += 4;
     }
     if(Rd != 0xF)
     {
-        cpu.R[15] += 2;
+        R[15] += 2;
     }
 }
 
@@ -1964,7 +1998,7 @@ void gbaCPU::T_SDP_CMP(uint16_t opcode)
     uint8_t H1 = ((opcode >> 7) & 0x1);
     Rd = Rd + (H1 * 8);
     Rm = Rm + (H2 * 8);
-    uint32_t result = cpu.R[Rd] - cpu.R[Rm];
+    uint32_t result = R[Rd] - R[Rm];
     if(Rm == 0xF)
     {
         result -= 4;
@@ -1974,31 +2008,29 @@ void gbaCPU::T_SDP_CMP(uint16_t opcode)
         result += 4;
     }
 
-    cpu.cpsr.N = ((result & 0x80000000) != 0);
-    cpu.cpsr.Z = (result == 0);
-    cpu.cpsr.C = ((uint64_t)0xFFFFFFFF >= ((uint64_t)cpu.R[Rd] - (uint64_t)cpu.R[Rm]));
-    cpu.cpsr.V = (( (uint64_t)cpu.R[Rd] ^ (uint64_t)cpu.R[Rm] ) &
-                     ( ( (uint64_t)cpu.R[Rd] ^ result ) ) &
+    cpsr.N = ((result & 0x80000000) != 0);
+    cpsr.Z = (result == 0);
+    cpsr.C = ((uint64_t)0xFFFFFFFF >= ((uint64_t)R[Rd] - (uint64_t)R[Rm]));
+    cpsr.V = (( (uint64_t)R[Rd] ^ (uint64_t)R[Rm] ) &
+                     ( ( (uint64_t)R[Rd] ^ result ) ) &
                      0x80000000 ) != 0;
-    cpu.R[15] += 2;
+    R[15] += 2;
 }
 
 void gbaCPU::T_SDP_MOV(uint16_t opcode)
 {
+    //printf("PC: 0x%X\n", R[15]);
+    R[15] += 2;
     uint8_t Rd = ((opcode) & 0x7);
     uint8_t Rm = ((opcode >> 3) & 0x7);
     uint8_t H2 = ((opcode >> 6) & 0x1);
     uint8_t H1 = ((opcode >> 7) & 0x1);
     Rd = Rd + (H1 * 8);
     Rm = Rm + (H2 * 8);
-    cpu.R[Rd] = cpu.R[Rm];
+    R[Rd] = R[Rm];
     if(Rm == 0xF)
     {
-        cpu.R[Rd] += 4;
-    }
-    if(Rd != 0xF)
-    {
-        cpu.R[15] += 2;
+        R[Rd] += 2;
     }
 }
 
@@ -2010,30 +2042,30 @@ void gbaCPU::T_ADJ_STACK(uint16_t opcode)
     switch(S)
     {
         case 0:
-            cpu.R[13] += offset;
+            R[13] += offset;
         break;
 
         case 1:
-            cpu.R[13] -= offset;
+            R[13] -= offset;
         break;
     }
-    cpu.R[15] += 2;
+    R[15] += 2;
 }
 
 void gbaCPU::T_SWI(uint16_t opcode)
 {
-    cpu.R1314_svc[1] = (cpu.R[15] + 2);
-    //printf("Return Address: 0x%X\n", (cpu.R[15] + 2));
-    //printf("R14: 0x%X\n", cpu.R[14]);
-    cpu.spsr_svc = cpu.cpsr;
-    //printf("R14: 0x%X\n", cpu.R[14]);
+    R1314_svc[1] = (R[15] + 2);
+    //printf("Return Address: 0x%X\n", (R[15] + 2));
+    //printf("R14: 0x%X\n", R[14]);
+    spsr_svc = cpsr;
+    //printf("R14: 0x%X\n", R[14]);
     modeSwitch(0x13);
-    //printf("R14: 0x%X\n", cpu.R[14]);
-    cpu.cpsr.T = false;
-    cpu.cpsr.I = true;
-    cpu.R[15] = 0x8;
-    //printf("R14: 0x%X\n", cpu.R[14]);
-    //cpu.cpsr.mode = 0x13;
+    //printf("R14: 0x%X\n", R[14]);
+    cpsr.T = false;
+    cpsr.I = true;
+    R[15] = 0x8;
+    //printf("R14: 0x%X\n", R[14]);
+    //cpsr.mode = 0x13;
 
     //if((opcode & 0xFF) == 0xC)
     //{

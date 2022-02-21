@@ -7,6 +7,7 @@
 #include "audio.hpp"
 #include "display.hpp"
 #include <thread>
+#include <chrono>
 
 using namespace std;
 
@@ -83,8 +84,12 @@ int main()
     //return 0;
 
     io.KEYINPUT = 0xFFFF;
+    const uint64_t sync60FPS = 16666666;
     //ui.pauseEmulation = true;
     //ui.runNoStep = false;
+    //ui.pauseEmulation = true;
+            //ui.useRunTo = false;
+    auto startNanos = std::chrono::high_resolution_clock::now();
     while(!ui.endEmulator) // Main EMU Loop
     {
         //io.writeMem(0x030022DC, 0, 1);
@@ -107,15 +112,13 @@ int main()
             }
             SDL_Delay(1);
         }
-        switch(cpu.cpsr.T)
+        if(cpu.cpsr.T)
         {
-            case 0:
-                cpu.R[15] = cpu.R[15] & 0xFFFFFFFC;
-            break;
-
-            case 1:
-                cpu.R[15] = cpu.R[15] & 0xFFFFFFFE;
-            break;
+            cpu.R[15] = cpu.R[15] & 0xFFFFFFFE;
+        }
+        else
+        {
+            cpu.R[15] = cpu.R[15] & 0xFFFFFFFC;
         }
         cpu.opcodesRan++;
         if(cpu.opcodesRan % (opPerFrame / 260) == 0)
@@ -134,7 +137,7 @@ int main()
         }
         if(cpu.opcodesRan % (opPerFrame / 228) == 0)
         {
-            //screen.drawScreenScanline();
+            screen.drawScreenScanline();
             io.VCOUNT++;
             io.IF |= 0x2;
             if(io.VCOUNT == 160)
@@ -148,10 +151,10 @@ int main()
             if(io.VCOUNT == (io.dispStat >> 8))
             {
                 //io.dispStat |= 0x4;
-                if(((io.dispStat) & 0x20) != 0)
-                {
+                //if(((io.dispStat) & 0x20) != 0)
+                //{
                     io.IF = io.IF | 0x4;
-                }
+                //}
             }
         }
         if(io.VCOUNT == 228)
@@ -161,14 +164,24 @@ int main()
             if(io.VCOUNT == (io.dispStat >> 8))
             {
                 //io.dispStat |= 0x4;
-                if(((io.dispStat) & 0x20) != 0)
-                {
-                    io.IF = io.IF | 0x4;
-                }
+                //if(((io.dispStat) & 0x20) != 0)
+                //{
+                //    io.IF = io.IF | 0x4;
+                //}
             }
             ui.framesPerSecondEMU++;
 
             SDL_PauseAudio(0);
+
+            if(ui.useVSYNC == true)
+            {
+                auto endNano = std::chrono::high_resolution_clock::now();
+                std::this_thread::sleep_for(std::chrono::nanoseconds(sync60FPS) -
+                                            std::chrono::nanoseconds(endNano - startNanos)
+                                            );
+                startNanos = std::chrono::high_resolution_clock::now();
+            }
+            //screen.drawScreen();
             //ui.handleUI();
             //input.handleInput();
         }
@@ -188,7 +201,7 @@ int main()
                 ui.useRunTo = false;
             }
         }
-        if((cpu.R[1]) == 0x06000421)
+        if((cpu.R[15]) == 0x08000718)
         {
             //ui.pauseEmulation = true;
             //ui.useRunTo = false;

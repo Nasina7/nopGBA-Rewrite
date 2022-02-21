@@ -5,6 +5,7 @@
 #define rotr32(x,a) ((x >> a) | (x << (32 - a)))
 #define rotr16(x,a) ((x >> a) | (x << (16 - a)))
 #define rotr8(x,a) ((x >> a) | (x << (8 - a)))
+#include <stdio.h>
 
 class gbaRAM
 {
@@ -101,7 +102,7 @@ class gbaIO {
         uint32_t get32bitOpcode(uint32_t location);
         uint32_t handleIORegs(uint32_t location, uint8_t mode, uint32_t value, bool write);
         uint32_t oldReadMem(uint32_t location, uint8_t mode);
-        uint32_t locationCorrector[0x3] = {
+        const uint32_t locationCorrector[0x3] = {
             0xFFFFFFFF,
             0xFFFFFFFE,
             0xFFFFFFFC
@@ -129,7 +130,7 @@ class gbaIO {
             uint32_t result = ((uint32_t*)(memPointArray[section2] + ((newLocation) & (memRangeArray[section2] - 1))))[0] & andTable[mode];
             if(mode == 1)
             {
-                //result = rotl16(result, (location & 0x1) * 8);
+                result = rotr32(result, (location & 0x1) * 8);
             }
             if(mode == 2)
             {

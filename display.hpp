@@ -11,6 +11,7 @@ class gbaDisplay {
         void drawScreenMode3();
         void drawScreenMode4();
         uint32_t screenArray[160][240];
+        uint32_t drawingArray[160][240];
 
         bool forceDrawBGs;
         bool forceDrawBg[4];
@@ -20,7 +21,7 @@ class gbaDisplay {
 
         void drawBGMode0(uint8_t bgNum);
         void drawSprites();
-        void drawSpriteTile(uint16_t tileNum, uint16_t xLoc, uint16_t yLoc, uint8_t mode, uint8_t palNum);
+        void drawSpriteTile(uint16_t tileNum, uint16_t xLoc, uint8_t yLoc, uint8_t mode, uint8_t palNum);
 };
 
 extern gbaDisplay screen;

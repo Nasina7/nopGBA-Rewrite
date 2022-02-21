@@ -44,15 +44,15 @@ class gbaCPU {
         uint32_t R1314_irq[2];
 
 
-        void doOpcode();
+        static void doOpcode();
         void handleTimers();
-        void doInterrupts();
-        void handleDMA();
-        uint32_t readCPSR(cpsrS value);
+        static void doInterrupts();
+        static void handleDMA();
+        static uint32_t readCPSR(cpsrS value);
         cpsrS writeCPSR(cpsrS value, uint32_t value2, bool doModeSwitch);
         uint8_t modeSwitch(uint8_t switchMode);
         uint32_t lastOpcodeRan;
-        void generateThumbLookup();
+        static void generateThumbLookup();
 
 
         int64_t timerScheduler[4];

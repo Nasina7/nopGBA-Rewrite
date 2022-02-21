@@ -23,7 +23,7 @@ void emuInit()
     {
         cpu.R[i] = 0;
     }
-
+    cpu.R[0] = 0xCA5;
     cpu.R[13] = 0x03007F00;
     cpu.R[14] = 0x08000000;
     cpu.R1314_svc[0] = 0x03007FE0;
@@ -112,7 +112,7 @@ int gbaUI::initUI()
     gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
     // 0 = NO VSYNC, 1 = VSYNC
-    if(SDL_GL_SetSwapInterval(0) == -1)
+    if(SDL_GL_SetSwapInterval(1) == -1)
     {
         printf("ERROR: %s\n",SDL_GetError());
     }
@@ -558,6 +558,15 @@ void gbaUI::mainWindow()
             }
             ImGui::EndMenu();
         }
+        if(ImGui::BeginMenu("Options"))
+        {
+            if(ImGui::MenuItem("Toggle VSync"))
+            {
+                ui.useVSYNC = !ui.useVSYNC;
+                SDL_GL_SetSwapInterval(ui.useVSYNC);
+            }
+            ImGui::EndMenu();
+        }
         ImGui::EndMenuBar();
     }
 
@@ -596,7 +605,7 @@ void gbaUI::mainWindow()
         }
     }
     screenView = 10;
-    screen.drawScreen();
+    //screen.drawScreen();
     //printf("Exit S Loop\n");
     glBindTexture(GL_TEXTURE_2D, screenView);
     //printf("Exit 1 Loop\n");

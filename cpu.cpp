@@ -617,13 +617,13 @@ void gbaCPU::doOpcode()
 {
     //runTHUMB(0);
     //return;
-    if(ui.experimentalSpeedup == true)
-    {
-        if(cpu.R[15] == 0x358 && io.IF == 0)
-        {
-            return;
-        }
-    }
+    //if(ui.experimentalSpeedup == true)
+    //{
+    //    if(cpu.R[15] == 0x358 && io.IF == 0)
+    //    {
+    //        return;
+    //    }
+    //}
     if(cpu.cpsr.T == modeArm)
     {
         cpu.decodeAndRunARM();
