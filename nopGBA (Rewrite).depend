@@ -9,7 +9,7 @@
 1645415426 /home/zach/codeblocks/nopGBA (Rewrite)/cpu.hpp
 	<stdint.h>
 
-1645423236 source:/home/zach/codeblocks/nopGBA (Rewrite)/main.cpp
+1645476316 source:/home/zach/codeblocks/nopGBA (Rewrite)/main.cpp
 	<iostream>
 	"file.hpp"
 	"cpu.hpp"
@@ -18,17 +18,20 @@
 	"input.hpp"
 	"audio.hpp"
 	"display.hpp"
+	"save.hpp"
 	<thread>
 	<chrono>
 
-1624471118 /home/zach/codeblocks/nopGBA (Rewrite)/file.hpp
+1645469676 /home/zach/codeblocks/nopGBA (Rewrite)/file.hpp
 	<iostream>
 
-1626809314 source:/home/zach/codeblocks/nopGBA (Rewrite)/file.cpp
+1645471533 source:/home/zach/codeblocks/nopGBA (Rewrite)/file.cpp
 	"file.hpp"
 	"cpu.hpp"
 	"io.hpp"
 	<stdint.h>
+	<cstring>
+	"save.hpp"
 
 1645335371 source:/home/zach/codeblocks/nopGBA (Rewrite)/arm.cpp
 	"cpu.hpp"
@@ -36,15 +39,16 @@
 	"ui.hpp"
 	<stdio.h>
 
-1645407715 /home/zach/codeblocks/nopGBA (Rewrite)/io.hpp
+1645476234 /home/zach/codeblocks/nopGBA (Rewrite)/io.hpp
 	<stdint.h>
 	<stdio.h>
 
-1645341710 source:/home/zach/codeblocks/nopGBA (Rewrite)/io.cpp
+1645476292 source:/home/zach/codeblocks/nopGBA (Rewrite)/io.cpp
 	"io.hpp"
 	"cpu.hpp"
 	"audio.hpp"
 	"ui.hpp"
+	"save.hpp"
 	<stdio.h>
 
 1645412154 source:/home/zach/codeblocks/nopGBA (Rewrite)/thumb.cpp
@@ -55,13 +59,14 @@
 
 1626281806 source:/home/zach/codeblocks/nopGBA (Rewrite)/z80.cpp
 
-1645416258 source:/home/zach/codeblocks/nopGBA (Rewrite)/ui.cpp
+1645484080 source:/home/zach/codeblocks/nopGBA (Rewrite)/ui.cpp
 	"ui.hpp"
 	"io.hpp"
 	"file.hpp"
 	"display.hpp"
 	"cpu.hpp"
 	"input.hpp"
+	"save.hpp"
 	"audio.hpp"
 	"imgui_impl_opengl3.h"
 	"imgui_impl_sdl.h"
@@ -71,7 +76,7 @@
 	<sstream>
 	<atomic>
 
-1645416200 /home/zach/codeblocks/nopGBA (Rewrite)/ui.hpp
+1645476751 /home/zach/codeblocks/nopGBA (Rewrite)/ui.hpp
 	<SDL2/SDL.h>
 	<GL/glew.h>
 	"imgui.h"
@@ -268,12 +273,12 @@
 1626826747 /home/zach/codeblocks/nopGBA (Rewrite)/input.hpp
 	<SDL2/SDL.h>
 
-1645405534 source:/home/zach/codeblocks/nopGBA (Rewrite)/display.cpp
+1645484055 source:/home/zach/codeblocks/nopGBA (Rewrite)/display.cpp
 	"display.hpp"
 	"ui.hpp"
 	"io.hpp"
 
-1645405313 /home/zach/codeblocks/nopGBA (Rewrite)/display.hpp
+1645479654 /home/zach/codeblocks/nopGBA (Rewrite)/display.hpp
 	<iostream>
 
 1643434155 source:/home/zach/codeblocks/nopGBA (Rewrite)/audio.cpp
@@ -283,4 +288,16 @@
 
 1645406615 /home/zach/codeblocks/nopGBA (Rewrite)/audio.hpp
 	<SDL2/SDL.h>
+
+1645475860 /home/zach/codeblocks/nopGBA (Rewrite)/save.hpp
+	<stdint.h>
+	<time.h>
+	<string>
+
+1645477708 source:/home/zach/codeblocks/nopGBA (Rewrite)/save.cpp
+	"save.hpp"
+	<fstream>
+	<sstream>
+	<time.h>
+	"io.hpp"
 

@@ -6,6 +6,7 @@
 #include "input.hpp"
 #include "audio.hpp"
 #include "display.hpp"
+#include "save.hpp"
 #include <thread>
 #include <chrono>
 
@@ -90,13 +91,12 @@ int main()
     //ui.pauseEmulation = true;
             //ui.useRunTo = false;
     auto startNanos = std::chrono::high_resolution_clock::now();
+    //ui.pauseEmulation = true;
     while(!ui.endEmulator) // Main EMU Loop
     {
         //io.writeMem(0x030022DC, 0, 1);
         cpu.doOpcode();//080010cc
 
-        ram.save[0] = 0x62;
-        ram.save[1] = 0x13;
         if(ui.disableTimers == false)
         {
             cpu.handleTimers();
@@ -172,6 +172,7 @@ int main()
             ui.framesPerSecondEMU++;
 
             SDL_PauseAudio(0);
+            save.saveData();
 
             if(ui.useVSYNC == true)
             {

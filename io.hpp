@@ -107,38 +107,7 @@ class gbaIO {
             0xFFFFFFFE,
             0xFFFFFFFC
         };
-        uint32_t readMem(uint32_t location, uint8_t mode)
-        {
-            //return oldReadMem(location, mode);
-            uint8_t section2 = location >> 24;
-            section2 &= 0xF;
-            //ram.accessTest[section]++;
-
-            if(section2 == 4)
-            {
-                return handleIORegs(location, mode, 0, false);
-            }
-            if(section2 == 1 || section2 == 0xF)
-            {
-                return 0;
-            }
-            if(section2 == 6 && (location & (memRangeArray[section2] - 1)) > 0x17FFF)
-            {
-                return 0;
-            }
-            uint32_t newLocation = location & locationCorrector[mode];
-            uint32_t result = ((uint32_t*)(memPointArray[section2] + ((newLocation) & (memRangeArray[section2] - 1))))[0] & andTable[mode];
-            if(mode == 1)
-            {
-                result = rotr32(result, (location & 0x1) * 8);
-            }
-            if(mode == 2)
-            {
-                result = rotr32(result, (location & 0x3) * 8);
-            }
-
-            return result;
-        }
+        uint32_t readMem(uint32_t location, uint8_t mode);
         void writeMem(uint32_t location, uint8_t mode, uint32_t value);
     private:
 };

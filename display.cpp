@@ -36,17 +36,25 @@ void gbaDisplay::drawScreenScanline()
 
 void gbaDisplay::drawScreenMode0Scanline()
 {
-    drawBGMode0Scanline(0xFF);
-    for(int i = 3; i != -1; i--)
+    if(io.VCOUNT == 0)
     {
-        for(int x = 3; x != -1; x--)
+        drawBGMode0Scanline(0xFF);
+    }
+    if(io.VCOUNT < 160)
+    {
+        for(int i = 3; i != -1; i--)
         {
-            if((io.bgCNT[x] & 0x3) == i)
+            for(int x = 3; x != -1; x--)
             {
-                drawBGMode0Scanline(x);
+                if((io.bgCNT[x] & 0x3) == i)
+                {
+                    drawBGMode0Scanline(x);
+                }
             }
         }
+        drawSpritesScanline();
     }
+
     //drawBGMode0(0xFF);
     //drawBGMode0(3);
     //drawBGMode0(2);
@@ -56,11 +64,264 @@ void gbaDisplay::drawScreenMode0Scanline()
     // THIS WILL NEED CHANGED LATER
     if(io.VCOUNT == 160)
     {
-        drawSprites();
+        //drawSprites();
     }
 
     //printf("BG: 0x%X\n", io.bgXScroll[2] / 8);
     //printf("Successful Exit\n");
+}
+
+uint8_t yTileSizeLookup[] =
+{
+    8,
+    8,
+    16,
+    0, // INVALID
+    16,
+    8,
+    32,
+    0, // INVALID
+    32,
+    16,
+    32,
+    0, // INVALID
+    64,
+    32,
+    64,
+    0, // INVALID
+};
+
+uint8_t xTileSizeLookup[] =
+{
+    8,
+    16,
+    8,
+    0, // INVALID
+    16,
+    32,
+    8,
+    0, // INVALID
+    32,
+    32,
+    16,
+    0, // INVALID
+    64,
+    64,
+    32,
+    0, // INVALID
+};
+
+void gbaDisplay::drawSpritesScanline()
+{
+    for(uint8_t sprID = 127; sprID != 0xFF; sprID--)
+    {
+        uint32_t sprOAMLocate = 0x07000000 + (sprID * 8);
+        uint16_t att0, xCoord, att1, tileNum, palNum;
+        uint8_t yCoord, objPrio;
+
+        yCoord = io.readMem(sprOAMLocate, 0);
+        if(io.VCOUNT < yCoord)
+        {
+            continue;
+        }
+        att0 = io.readMem(sprOAMLocate + 1, 0);
+        att1 = io.readMem(sprOAMLocate + 3, 0) & 0xFE;
+        uint8_t objSize = att1 >> 6;
+        objSize &= 0x3;
+        uint8_t objShape = att0 >> 6;
+        objShape &= 0x3;
+        uint8_t trueSize = (objSize & 0x3) << 2 | (objShape & 0x3);
+        if(io.VCOUNT >= yCoord + (yTileSizeLookup[trueSize]))
+        {
+            continue;
+        }
+        xCoord = io.readMem(sprOAMLocate + 2, 1) & 0x1FF;
+        tileNum = io.readMem(sprOAMLocate + 4, 1) & 0x3FF;
+        objPrio = io.readMem(sprOAMLocate + 5, 0) >> 2;
+        objPrio &= 0x3;
+        palNum = io.readMem(sprOAMLocate + 5, 0) >> 4;
+        palNum &= 0xF;
+
+
+        uint8_t objMode = att1 >> 4;
+        objMode &= 0x3;
+
+        //printf("PAL1: 0x%X\n",palNum);
+
+        //drawSpriteTile(tileNum, xCoord, yCoord, 0, palNum);
+        //printf("trueSize: 0x%X\n", trueSize);
+        int yTile = (io.VCOUNT - yCoord) / 8;
+        for(int xTile = 0; xTile < xTileSizeLookup[trueSize] / 8; xTile++)
+        {
+            //printf("RenderTile 0x%X\n",xTile);
+            switch((((io.lcdControl >> 6) & 0x1) << 2) | objMode)
+            {
+                case 0:
+                    drawSpriteTileScanline(tileNum + (xTile) + (yTile * 0x20),
+                                   xCoord + (xTile * 8),
+                                   yCoord + (yTile * 8),
+                                   objMode,
+                                   palNum,
+                                   objPrio);
+                break;
+
+
+                case 1:
+                    drawSpriteTileScanline(tileNum + (xTile) + (yTile * 0x20),
+                                   ((xTileSizeLookup[trueSize] + xCoord) - 8) - (xTile * 8),
+                                   yCoord + (yTile * 8),
+                                   objMode,
+                                   palNum,
+                                   objPrio);
+                break;
+
+                case 2:
+                    drawSpriteTileScanline(tileNum + (xTile) + (yTile * 0x20),
+                                   xCoord + (xTile * 8),
+                                   ((yTileSizeLookup[trueSize] + yCoord) - 8) - (yTile * 8),
+                                   objMode,
+                                   palNum,
+                                   objPrio);
+                break;
+
+                case 3:
+                    drawSpriteTileScanline(tileNum + (xTile) + (yTile * 0x20),
+                                   ((xTileSizeLookup[trueSize] + xCoord) - 8) - (xTile * 8),
+                                   ((yTileSizeLookup[trueSize] + yCoord) - 8) - (yTile * 8),
+                                   objMode,
+                                   palNum,
+                                   objPrio);
+                break;
+
+                case 4:
+                    drawSpriteTileScanline(tileNum + (xTile) + (yTile * (xTileSizeLookup[trueSize] / 8)),
+                                   xCoord + (xTile * 8),
+                                   yCoord + (yTile * 8),
+                                   objMode,
+                                   palNum,
+                                   objPrio);
+                break;
+
+                case 5:
+                    drawSpriteTileScanline(tileNum + (xTile) + (yTile * (xTileSizeLookup[trueSize] / 8)),
+                                   ((xTileSizeLookup[trueSize] + xCoord) - 8) - (xTile * 8),
+                                   yCoord + (yTile * 8),
+                                   objMode,
+                                   palNum,
+                                   objPrio);
+                break;
+
+                case 6:
+                    drawSpriteTileScanline(tileNum + (xTile) + (yTile * (xTileSizeLookup[trueSize] / 8)),
+                                   xCoord + (xTile * 8),
+                                   ((yTileSizeLookup[trueSize] + yCoord) - 8) - (yTile * 8),
+                                   objMode,
+                                   palNum,
+                                   objPrio);
+                break;
+
+                case 7:
+                    drawSpriteTileScanline(tileNum + (xTile) + (yTile * (xTileSizeLookup[trueSize] / 8)),
+                                   ((xTileSizeLookup[trueSize] + xCoord) - 8) - (xTile * 8),
+                                   ((yTileSizeLookup[trueSize] + yCoord) - 8) - (yTile * 8),
+                                   objMode,
+                                   palNum,
+                                   objPrio);
+                break;
+
+            }
+        }
+    }
+}
+
+void gbaDisplay::drawSpriteTileScanline(uint16_t tileNum, uint16_t xLoc, uint8_t yLoc, uint8_t mode, uint8_t palNum, uint8_t objPrio)
+{
+    uint8_t xStart, xEnd, yStart, yEnd;
+    int xAdd, yAdd;
+    switch(mode)
+    {
+        case 0:
+            xStart = 0;
+            xEnd = 8;
+            xAdd = 1;
+            yStart = 0;
+            yEnd = 8;
+            yAdd = 1;
+        break;
+
+        case 1:
+            xStart = 7;
+            xEnd = 0xFF;
+            xAdd = -1;
+            yStart = 0;
+            yEnd = 8;
+            yAdd = 1;
+        break;
+
+        case 2:
+            xStart = 0;
+            xEnd = 8;
+            xAdd = 1;
+            yStart = 7;
+            yEnd = 0xFF;
+            yAdd = -1;
+        break;
+
+        case 3:
+            xStart = 7;
+            xEnd = 0xFF;
+            xAdd = -1;
+            yStart = 7;
+            yEnd = 0xFF;
+            yAdd = -1;
+        break;
+    }
+
+    palNum += 0x10;
+    for(uint8_t x = xStart; x != xEnd; x += xAdd)
+    {
+        xLoc &= 0x1FF;
+        //printf("x: 0x%X\n",x);
+        uint8_t spriteY = (io.VCOUNT - yLoc);
+        uint32_t curTileDataLocation = 0x06010000 + ((tileNum) * 0x20) + (spriteY * 4) + ((x) / 2);
+
+        uint8_t tileDataTrue = io.readMem(curTileDataLocation, 0);
+
+        uint32_t location = 0x05000000 + ((tileDataTrue & 0xF)) + ((tileDataTrue >> 4) * 0x20);
+
+        uint8_t colorIndex;
+
+        switch(x % 2)
+        {
+            case 0:
+                location = 0x05000000 + ((tileDataTrue & 0xF) * 2);
+                colorIndex = ((tileDataTrue & 0xF));
+            break;
+
+            case 1:
+                location = 0x05000000 + (((tileDataTrue >> 4)) * 2);
+                colorIndex = (((tileDataTrue >> 4) & 0xF));
+            break;
+        }
+        //printf("location: 0x%X\n", location);
+        //printf("palNum: 0x%X\n", palNum);
+        uint16_t color = io.readMem(location + (palNum * 0x20), 1);
+        //printf("XWRITE: %i\n",x + (xTile * 8));
+        //printf("YWRITE: %i\n",y + (yTile * 8));
+        int finalX = x;
+        //int finalY = y;
+        if(colorIndex != 0 && xLoc < 240 && io.VCOUNT < 160 && objPrio <= prioArray[io.VCOUNT][xLoc])
+        {
+            drawingArray[io.VCOUNT][xLoc] = (0xFF << 24) |
+                   ((((color >> 10) & 0x1F) << 3) << 16) |
+                   ((((color >> 5) & 0x1F) << 3) << 8) |
+                   (((color & 0x1F) << 3));
+        }
+        xLoc++;
+
+
+        //printf("SUCCESSFULLY WROTE\n");
+    }
 }
 
 void gbaDisplay::drawBGMode0Scanline(uint8_t bgNum)
@@ -73,13 +334,18 @@ void gbaDisplay::drawBGMode0Scanline(uint8_t bgNum)
         {
             return;
         }
-        for(int x = 0; x < 240; x++)
+        for(int y = 0; y < 160; y++)
         {
-            drawingArray[io.VCOUNT][x] = (0xFF << 24) |
-                                ((((color >> 10) & 0x1F) << 3) << 16) |
-                                ((((color >> 5) & 0x1F) << 3) << 8) |
-                                (((color & 0x1F) << 3));
+            for(int x = 0; x < 240; x++)
+            {
+                drawingArray[y][x] = (0xFF << 24) |
+                                    ((((color >> 10) & 0x1F) << 3) << 16) |
+                                    ((((color >> 5) & 0x1F) << 3) << 8) |
+                                    (((color & 0x1F) << 3));
+                prioArray[y][x] = 0xFF;
+            }
         }
+
         return;
     }
     if( ( ( io.lcdControl >> (8 + bgNum) ) & 0x1 ) == 0)
@@ -181,15 +447,17 @@ void gbaDisplay::drawBGMode0Scanline(uint8_t bgNum)
         yAmount & 0x3F;
         if(yAmount >= 0x20)
         {
-            yAmount &= 0x1F;
+
+            //yAmount &= 0x1F;
             switch(io.bgCNT[bgNum] >> 14)
             {
-                case 2:
-                    yAmount += 0x800;
+                case 0 ... 1:
+                    yAmount &= 0x1F;
+                    //yAmount += 0x800;
                 break;
 
                 case 3:
-                    yAmount += 0x800;
+                    //yAmount += 0x800;
                 break;
             }
         }
@@ -302,6 +570,7 @@ void gbaDisplay::drawBGMode0Scanline(uint8_t bgNum)
                                 break;
                             }
                             drawingArray[yWrite][xWrite] = color;
+                            prioArray[yWrite][xWrite] = bg0priority;
                         }
                         break;
 
@@ -318,6 +587,7 @@ void gbaDisplay::drawBGMode0Scanline(uint8_t bgNum)
                                 break;
                             }
                             drawingArray[yWrite][xWrite] = color;
+                            prioArray[yWrite][xWrite] = bg0priority;
                         }
                         break;
                     }
@@ -464,45 +734,6 @@ void gbaDisplay::drawSpriteTile(uint16_t tileNum, uint16_t xLoc, uint8_t yLoc, u
     }
 }
 
-uint8_t yTileSizeLookup[] =
-{
-    8,
-    8,
-    16,
-    0, // INVALID
-    16,
-    8,
-    32,
-    0, // INVALID
-    32,
-    16,
-    32,
-    0, // INVALID
-    64,
-    32,
-    64,
-    0, // INVALID
-};
-
-uint8_t xTileSizeLookup[] =
-{
-    8,
-    16,
-    8,
-    0, // INVALID
-    16,
-    32,
-    8,
-    0, // INVALID
-    32,
-    32,
-    16,
-    0, // INVALID
-    64,
-    64,
-    32,
-    0, // INVALID
-};
 
 void gbaDisplay::drawSprites()
 {

@@ -34,6 +34,8 @@ class gbaUI {
     private:
         void testWindow();
 
+        void flashWindow();
+
         void errorWindow();
         const char* errorWindowMessage;
         uint32_t errorArgument;

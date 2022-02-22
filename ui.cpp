@@ -4,6 +4,7 @@
 #include "display.hpp"
 #include "cpu.hpp"
 #include "input.hpp"
+#include "save.hpp"
 #include "audio.hpp"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl.h"
@@ -43,10 +44,14 @@ void emuInit()
     cpu.cpsr.Z = false;
 
 
-    for(int i = 0; i < 0x10000; i++)
+    if(save.saveWasLoaded == false)
     {
-        ram.save[i] = 0xFF;
+        for(int i = 0; i < 0x10000; i++)
+        {
+            ram.save[i] = 0xFF;
+        }
     }
+
     io.WAITCNT = 0x4317;
     io.IE = 0;
     io.IF = 0;
@@ -296,6 +301,7 @@ void gbaUI::debugWindow()
     ImGui::Begin("Debug");
     if(ImGui::IsWindowCollapsed() == false)
     {
+        ImGui::InputScalar("Save Type: ", ImGuiDataType_U8, &save.currentSaveType, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
         if(ImGui::Button("Step"))
         {
             setRunEmulation(true);
@@ -534,6 +540,17 @@ uint64_t secondsPassed = 0;
 
 bool initedUI = false;
 
+void gbaUI::flashWindow()
+{
+    ImGui::Begin("Flash");
+    ImGui::InputScalar("Save Type: ", ImGuiDataType_U8, &save.currentSaveType, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::InputScalar("Flash State: ", ImGuiDataType_U8, &save.flashState, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::InputScalar("Chip ID: ", ImGuiDataType_U16, &save.chipID, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::InputScalar("Command Progress: ", ImGuiDataType_U8, &save.issueCommand, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::InputScalar("Current Flash Page: ", ImGuiDataType_U8, &save.currentFlashPage, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::End();
+}
+
 void gbaUI::mainWindow()
 {
     ImGuiIO io2 = ImGui::GetIO();
@@ -649,6 +666,7 @@ void gbaUI::handleUI()
         ImGui::NewFrame();
 
         mainWindow();
+        flashWindow();
         //testWindow();
         speedHacks();
         dmaWindow();

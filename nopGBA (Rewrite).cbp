@@ -130,6 +130,8 @@
 		<Unit filename="io.cpp" />
 		<Unit filename="io.hpp" />
 		<Unit filename="main.cpp" />
+		<Unit filename="save.cpp" />
+		<Unit filename="save.hpp" />
 		<Unit filename="thumb.cpp" />
 		<Unit filename="ui.cpp" />
 		<Unit filename="ui.hpp" />
